@@ -1358,21 +1358,26 @@ async function createAccountByAdmin(){
     const { data: authData, error: authErr } = await tempSb.auth.signUp({
       email,
       password,
-      options: { data: { role } }
+      options: { 
+        data: { role: role }
+      }
     });
 
     if(authErr) throw authErr;
 
     if(authData.user){
-      await sb.from('profiles').upsert({
+      const { error: profErr } = await sb.from('profiles').upsert({
         id: authData.user.id,
-        email,
-        display_name: email,
-        role
+        email: email,
+        display_name: email.split('@')[0],
+        role: role
       });
+      if(profErr) {
+        console.warn('寫入 profiles 警告:', profErr);
+      }
     }
 
-    toast('帳號建立成功！成員現在可以直接登入');
+    toast('帳號建立成功！已加入成員列表');
     document.getElementById('new_user_email').value = '';
     document.getElementById('new_user_password').value = '';
     await loadTeamProfiles();
