@@ -81,7 +81,6 @@
   }
   .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
 
-  /* ---------- 主體視窗高度鎖定 ---------- */
   #app{display:none;height:100vh;overflow:hidden;}
   .shell{display:flex;height:100vh;overflow:hidden;}
   .sidebar{
@@ -114,7 +113,6 @@
   .topbar h1{font-size:17px;margin:0;font-weight:700;}
   .topbar .desc{font-size:12.5px;color:var(--muted);margin-top:2px;}
   
-  /* 只有右邊 content 獨立滑動 */
   .content{padding:28px 36px;overflow-y:auto;flex:1;}
   .panel{display:none;max-width:1200px;margin:0 auto;}
   .panel.active{display:block;}
@@ -326,6 +324,7 @@
     <button class="nav-item" data-panel="panel-list" onclick="switchPanel('panel-list')">📋 <span class="label">報價單列表</span></button>
     <button class="nav-item" data-panel="panel-clients" onclick="switchPanel('panel-clients')">🏢 <span class="label">客戶資料管理</span></button>
     <button class="nav-item" data-panel="panel-catalog" onclick="switchPanel('panel-catalog')">🗂 <span class="label">服務項目管理</span></button>
+    <button class="nav-item" id="nav-users" data-panel="panel-users" onclick="switchPanel('panel-users')" style="display:none;">👥 <span class="label">成員帳號管理</span></button>
     <button class="nav-item" data-panel="panel-settings" onclick="switchPanel('panel-settings')">⚙️ <span class="label">設定</span></button>
     <div class="sidebar-foot">
       <div class="user-chip">
@@ -546,22 +545,10 @@
         </div>
       </div>
 
-      <!-- ---- 5. 設定 ---- -->
-      <div class="panel" id="panel-settings">
-        <!-- 個人業務資料設定 -->
+      <!-- ---- 5. 成員帳號管理（管理員專屬獨立分頁） ---- -->
+      <div class="panel" id="panel-users">
         <div class="card">
-          <h2>👤 個人業務資料設定</h2>
-          <div class="hint" style="margin-bottom:12px;">設定你的業務姓名，建立新報價單時將會自動填入「業務負責人」。</div>
-          <div class="grid2">
-            <div class="field"><label>業務姓名／顯示名稱</label><input type="text" id="my_display_name" placeholder="例如：郭楚葳 Willy"></div>
-            <div class="field"><label>業務電話 / 手機</label><input type="text" id="my_phone" placeholder="例如：0912-345-678"></div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="savePersonalProfile()">儲存個人資料</button>
-        </div>
-
-        <!-- 管理員建立使用者功能（僅管理員顯示） -->
-        <div class="card" id="adminUserCard" style="display:none;">
-          <h2>👥 新增使用者帳號（管理員專用）</h2>
+          <h2>新增成員帳號</h2>
           <div class="hint" style="margin-bottom:12px;">直接為公司內部成員開立帳號與初始密碼，建立後成員即可登入。</div>
           <div class="grid3">
             <div class="field">
@@ -583,6 +570,35 @@
           <button class="btn btn-primary btn-sm" id="createUserBtn" onclick="createAccountByAdmin()">建立使用者</button>
         </div>
 
+        <div class="card" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>帳號 (Email)</th>
+                <th>姓名 / 顯示名稱</th>
+                <th>業務電話</th>
+                <th>系統權限</th>
+              </tr>
+            </thead>
+            <tbody id="usersBody"></tbody>
+          </table>
+          <div class="empty-state" id="usersEmpty" style="display:none;">目前尚無其他成員資料</div>
+        </div>
+      </div>
+
+      <!-- ---- 6. 設定（純淨個人與公司資訊） ---- -->
+      <div class="panel" id="panel-settings">
+        <!-- 個人業務資料設定 -->
+        <div class="card">
+          <h2>👤 個人業務資料設定</h2>
+          <div class="hint" style="margin-bottom:12px;">設定你的業務姓名，建立新報價單時將會自動填入「業務負責人」。</div>
+          <div class="grid2">
+            <div class="field"><label>業務姓名／顯示名稱</label><input type="text" id="my_display_name" placeholder="例如：郭楚葳 Willy"></div>
+            <div class="field"><label>業務電話 / 手機</label><input type="text" id="my_phone" placeholder="例如：0912-345-678"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="savePersonalProfile()">儲存個人資料</button>
+        </div>
+
         <!-- 公司資訊設定 -->
         <div class="card">
           <h2>公司資訊（列印於報價單上）</h2>
@@ -597,6 +613,8 @@
           </div>
           <button class="btn btn-primary btn-sm" id="settingsSaveBtn" onclick="saveCompanySettings()">儲存設定</button>
         </div>
+
+        <!-- 連線資訊 -->
         <div class="card">
           <h2>連線設定</h2>
           <div class="field"><label>Supabase URL</label><input type="text" id="conn_url" readonly></div>
@@ -807,6 +825,7 @@ let companySettings = { company_name:'優士國際資安股份有限公司', add
 let catalog = [];
 let quotations = [];
 let clients = [];
+let teamProfiles = [];
 let currentQuote = null;
 let itemSeq = 0;
 
@@ -927,6 +946,11 @@ function updateRoleUI(){
     userEmailEl.textContent = displayName;
     userEmailEl.title = currentUser.email;
   }
+  // 控制側邊欄「成員帳號管理」是否顯示（僅管理員顯示）
+  const navUsers = document.getElementById('nav-users');
+  if(navUsers){
+    navUsers.style.display = isAdmin ? 'flex' : 'none';
+  }
 }
 
 async function afterLogin(){
@@ -967,6 +991,7 @@ async function afterLogin(){
     await loadCatalog();
     await loadQuotations();
     await loadClients();
+    if(role === 'admin') await loadTeamProfiles();
     resetEditor();
   }catch(e){
     console.error('Fatal load error:', e);
@@ -986,9 +1011,6 @@ function applySettingsPermissions(){
   });
   const saveBtn = document.getElementById('settingsSaveBtn');
   if(saveBtn) saveBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-  
-  const adminUserCard = document.getElementById('adminUserCard');
-  if(adminUserCard) adminUserCard.style.display = isAdmin ? 'block' : 'none';
 
   const hintEl = document.getElementById('settingsAdminHint');
   if(hintEl){
@@ -1224,7 +1246,39 @@ function applyClientToEditor(id){
   toast('已將客戶資料帶入報價單');
 }
 
-/* ================= 管理員建立帳號 ================= */
+/* ================= 成員帳號管理（獨立分頁） ================= */
+async function loadTeamProfiles(){
+  try{
+    const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending:false });
+    if(!error && data){
+      teamProfiles = data;
+    }
+  }catch(e){
+    console.warn('loadTeamProfiles error:', e);
+    teamProfiles = [];
+  }
+  renderTeamProfiles();
+}
+
+function renderTeamProfiles(){
+  const body = document.getElementById('usersBody');
+  const empty = document.getElementById('usersEmpty');
+  if(!body) return;
+  body.innerHTML = '';
+  empty.style.display = teamProfiles.length ? 'none' : 'block';
+
+  teamProfiles.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${escapeHtml(u.email || '-')}</b></td>
+      <td>${escapeHtml(u.display_name || '-')}</td>
+      <td>${escapeHtml(u.phone || '-')}</td>
+      <td><span class="badge ${u.role === 'admin' ? 'accepted' : 'draft'}">${u.role === 'admin' ? '管理員' : '一般人員'}</span></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
 async function createAccountByAdmin(){
   const email = document.getElementById('new_user_email').value.trim();
   const password = document.getElementById('new_user_password').value;
@@ -1268,6 +1322,7 @@ async function createAccountByAdmin(){
     toast('帳號建立成功！成員現在可以直接登入');
     document.getElementById('new_user_email').value = '';
     document.getElementById('new_user_password').value = '';
+    await loadTeamProfiles();
   }catch(e){
     toast('建立帳號失敗：' + e.message, true);
   }finally{
@@ -1329,7 +1384,8 @@ function switchPanel(id){
     'panel-list':['報價單列表','檢視、搜尋與管理已建立的報價單'],
     'panel-clients':['客戶資料管理','管理內部常用客戶與聯絡資料庫'],
     'panel-catalog':['服務項目管理','管理可重複使用的服務項目目錄'],
-    'panel-settings':['設定','個人資料、公司資訊與帳號設定'],
+    'panel-users':['成員帳號管理','管理公司內部使用者帳號與權限'],
+    'panel-settings':['設定','個人業務資料與公司發票資訊設定'],
   };
   if(titles[id]){
     document.getElementById('pageTitle').textContent = titles[id][0];
@@ -1339,6 +1395,7 @@ function switchPanel(id){
   if(id === 'panel-list') renderList();
   if(id === 'panel-clients') renderClientsList();
   if(id === 'panel-catalog') renderCatalog();
+  if(id === 'panel-users') loadTeamProfiles();
 }
 
 /* ================= 公司設定 ================= */
