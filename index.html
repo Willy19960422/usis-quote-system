@@ -240,7 +240,7 @@
 <body>
 
 <!-- ============ 1) 連線設定（首次使用） ============ -->
-<div id="setupScreen" class="center-screen">
+<div id="setupScreen" class="center-screen" style="display:none;">
   <div class="auth-card">
     <div class="auth-brand">
       <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" class="logo-img" alt="USIS">
@@ -283,7 +283,8 @@
       <input type="password" id="loginPassword" autocomplete="current-password">
     </div>
     <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">登入</button>
-    <div class="hint">尚未有帳號？請洽系統管理員於後台建立。</div>
+    <div class="hint">尚未有帳號？請洽系統管理員於後台建立，本系統不開放自行註冊。</div>
+  </div>
 </div>
 
 <!-- ============ 3) 主系統 ============ -->
@@ -546,6 +547,9 @@
 const DEFAULT_SB_URL = 'https://jkhdalsqdjugcweepvmt.supabase.co';
 const DEFAULT_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpraGRhbHNxZGp1Z2N3ZWVwdm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5ODc4MDcsImV4cCI6MjEwNDU2MzgwN30.ryURSFwu5gEYwk0gqvFgdP-fP-7jlN3ReH37CbzKW8o';
 
+// 管理員名單備援（確保即使 RLS 阻擋查詢，前端依然精確識別管理員權限）
+const ADMIN_EMAILS = ['willy.k@usis.com.tw'];
+
 // 產品清單預設資料庫
 const DEFAULT_CATALOG = [
   { category:'ISO驗證', item_name:'資訊安全管理系統', description:'ISO/IEC 27001 · ISMS', unit:'式', default_price:0 },
@@ -623,13 +627,18 @@ function initSupabase(){
 }
 
 async function checkSession(){
-  const { data:{ session } } = await sb.auth.getSession();
-  if(session && session.user){
-    currentUser = session.user;
-    await afterLogin();
-  }else{
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session && session.user){
+      currentUser = session.user;
+      await afterLogin();
+    }else{
+      document.getElementById('loginScreen').style.display='flex';
+      document.getElementById('app').style.display='none';
+    }
+  }catch(e){
+    console.error('Session check error:', e);
     document.getElementById('loginScreen').style.display='flex';
-    document.getElementById('app').style.display='none';
   }
 }
 
@@ -645,18 +654,23 @@ async function doLogin(){
     return;
   }
   btn.disabled = true; btn.textContent = '登入中...';
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  btn.disabled = false; btn.textContent = '登入';
-  if(error){
-    errEl.innerHTML = '<div class="error-msg">登入失敗：帳號或密碼錯誤，或此帳號尚未建立</div>';
-    return;
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){
+      errEl.innerHTML = '<div class="error-msg">登入失敗：帳號或密碼錯誤</div>';
+      return;
+    }
+    currentUser = data.user;
+    await afterLogin();
+  }catch(e){
+    errEl.innerHTML = '<div class="error-msg">連線異常：' + e.message + '</div>';
+  }finally{
+    btn.disabled = false; btn.textContent = '登入';
   }
-  currentUser = data.user;
-  await afterLogin();
 }
 
 async function doLogout(){
-  await sb.auth.signOut();
+  try{ await sb.auth.signOut(); }catch(e){}
   currentUser = null; currentProfile = null;
   document.getElementById('app').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -665,69 +679,92 @@ async function doLogout(){
 }
 
 async function afterLogin(){
-  // 修正角色抓取問題：先以 id 查，查不到則以 email 查，並印出 debug 訊息
-  let profile = null;
-  const { data: pById, error: errById } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
-  if(pById){
-    profile = pById;
-  } else {
-    if(errById) console.warn('profiles query by id error:', errById);
-    const { data: pByEmail, error: errByEmail } = await sb.from('profiles').select('*').eq('email', currentUser.email).maybeSingle();
-    if(pByEmail) profile = pByEmail;
-    else if(errByEmail) console.warn('profiles query by email error:', errByEmail);
+  try{
+    // 角色權限判斷（結合 Supabase 表與管理員 Email 保底）
+    let role = 'staff';
+    if(ADMIN_EMAILS.includes(currentUser.email?.toLowerCase())){
+      role = 'admin';
+    }
+    try{
+      const { data: pById } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+      if(pById && pById.role) role = pById.role;
+    }catch(err){
+      console.warn('Profiles query failed, fallback used:', err);
+    }
+
+    currentProfile = { role, email: currentUser.email };
+    const isAdmin = (role === 'admin');
+
+    document.getElementById('userEmail').textContent = currentUser.email;
+    const roleEl = document.getElementById('userRole');
+    roleEl.textContent = isAdmin ? '管理員' : '一般人員';
+    roleEl.className = 'role' + (isAdmin ? ' admin' : '');
+
+    document.getElementById('conn_url').value = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='block';
+
+    await loadCompanySettings();
+    await loadCatalog();
+    await loadQuotations();
+    resetEditor();
+    applySettingsPermissions();
+  }catch(e){
+    console.error('Fatal load error:', e);
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='block';
   }
-
-  currentProfile = profile || { role:'staff', email: currentUser.email };
-  const isAdmin = currentProfile.role === 'admin';
-
-  document.getElementById('userEmail').textContent = currentUser.email;
-  const roleEl = document.getElementById('userRole');
-  roleEl.textContent = isAdmin ? '管理員' : '一般人員';
-  roleEl.className = 'role' + (isAdmin ? ' admin' : '');
-
-  document.getElementById('conn_url').value = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('app').style.display='block';
-
-  await loadCompanySettings();
-  await loadCatalog();
-  await loadQuotations();
-  resetEditor();
-  applySettingsPermissions();
 }
 
 function applySettingsPermissions(){
   const isAdmin = currentProfile && currentProfile.role === 'admin';
   const ids = ['s_company_name','s_tax_id','s_address','s_phone','s_prefix','s_bank'];
-  ids.forEach(id => document.getElementById(id).disabled = !isAdmin);
-  document.getElementById('settingsSaveBtn').style.display = isAdmin ? 'inline-flex' : 'none';
-  document.getElementById('settingsAdminHint').textContent = isAdmin
-    ? '你是管理員，可編輯並儲存公司基本資料。'
-    : '公司資訊僅管理員可修改，如需更新請聯絡管理員。';
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.disabled = !isAdmin;
+  });
+  const saveBtn = document.getElementById('settingsSaveBtn');
+  if(saveBtn) saveBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  
+  const hintEl = document.getElementById('settingsAdminHint');
+  if(hintEl){
+    hintEl.textContent = isAdmin
+      ? '你是管理員，可編輯並儲存公司基本資料。'
+      : '公司資訊僅管理員可修改，如需更新請聯絡管理員。';
+  }
 }
 
 /* ================= 導覽切換 ================= */
 function switchPanel(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelector(`.nav-item[data-panel="${id}"]`).classList.add('active');
+  const target = document.getElementById(id);
+  if(target) target.classList.add('active');
+  const nav = document.querySelector(`.nav-item[data-panel="${id}"]`);
+  if(nav) nav.classList.add('active');
+
   const titles = {
     'panel-editor':['新增報價單','建立報價單並存檔'],
     'panel-list':['報價單列表','檢視、搜尋與管理已建立的報價單'],
     'panel-catalog':['服務項目管理','管理可重複使用的服務項目目錄'],
     'panel-settings':['設定','公司資訊與連線設定'],
   };
-  document.getElementById('pageTitle').textContent = titles[id][0];
-  document.getElementById('pageDesc').textContent = titles[id][1];
+  if(titles[id]){
+    document.getElementById('pageTitle').textContent = titles[id][0];
+    document.getElementById('pageDesc').textContent = titles[id][1];
+  }
   if(id === 'panel-list') renderList();
   if(id === 'panel-catalog') renderCatalog();
 }
 
 /* ================= 公司設定 ================= */
 async function loadCompanySettings(){
-  const { data } = await sb.from('company_settings').select('*').eq('id',1).maybeSingle();
-  if(data) companySettings = data;
+  try{
+    const { data } = await sb.from('company_settings').select('*').eq('id',1).maybeSingle();
+    if(data) companySettings = data;
+  }catch(e){
+    console.warn('loadCompanySettings warning:', e);
+  }
   document.getElementById('s_company_name').value = companySettings.company_name||'';
   document.getElementById('s_tax_id').value = companySettings.tax_id||'';
   document.getElementById('s_address').value = companySettings.address||'';
@@ -736,6 +773,7 @@ async function loadCompanySettings(){
   document.getElementById('s_bank').value = companySettings.bank_info||'';
   document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
 }
+
 async function saveCompanySettings(){
   const payload = {
     id:1,
@@ -746,25 +784,28 @@ async function saveCompanySettings(){
     quote_prefix: document.getElementById('s_prefix').value.trim() || 'QT',
     bank_info: document.getElementById('s_bank').value.trim(),
   };
-  const { error } = await sb.from('company_settings').upsert(payload);
-  if(error){ toast('儲存失敗：' + error.message, true); return; }
-  companySettings = {...companySettings, ...payload};
-  toast('公司設定已儲存');
+  try{
+    const { error } = await sb.from('company_settings').upsert(payload);
+    if(error) throw error;
+    companySettings = {...companySettings, ...payload};
+    toast('公司設定已儲存');
+  }catch(err){
+    toast('儲存失敗：' + err.message, true);
+  }
 }
 
 /* ================= 服務目錄 ================= */
 async function loadCatalog(){
-  const { data, error } = await sb.from('service_catalog').select('*').order('sort_order');
-  if(!error && data && data.length > 0){
-    catalog = data;
-  }else{
-    // 若資料庫為空，自動載入 12 項標準服務
-    catalog = [...DEFAULT_CATALOG];
-    if(sb){
-      await sb.from('service_catalog').insert(
-        DEFAULT_CATALOG.map((item, idx) => ({ ...item, sort_order: idx + 1 }))
-      );
+  try{
+    const { data, error } = await sb.from('service_catalog').select('*').order('sort_order');
+    if(!error && data && data.length > 0){
+      catalog = data;
+    } else {
+      catalog = [...DEFAULT_CATALOG];
     }
+  }catch(e){
+    console.warn('loadCatalog fallback to local:', e);
+    catalog = [...DEFAULT_CATALOG];
   }
   renderCatalog();
 }
@@ -785,6 +826,7 @@ function renderCatalog(){
     body.appendChild(tr);
   });
 }
+
 async function addCatalogItem(){
   const item_name = document.getElementById('c_name').value.trim();
   if(!item_name){ toast('請輸入項目名稱', true); return; }
@@ -796,19 +838,28 @@ async function addCatalogItem(){
     default_price: Number(document.getElementById('c_price').value)||0,
     sort_order: catalog.length + 1,
   };
-  const { error } = await sb.from('service_catalog').insert(payload);
-  if(error){ toast('新增失敗：' + error.message, true); return; }
-  document.getElementById('c_name').value='';
-  document.getElementById('c_desc').value='';
-  document.getElementById('c_price').value='0';
-  await loadCatalog();
-  toast('已新增到服務目錄');
+  try{
+    const { error } = await sb.from('service_catalog').insert(payload);
+    if(error) throw error;
+    document.getElementById('c_name').value='';
+    document.getElementById('c_desc').value='';
+    document.getElementById('c_price').value='0';
+    await loadCatalog();
+    toast('已新增到服務目錄');
+  }catch(e){
+    toast('新增失敗：' + e.message, true);
+  }
 }
+
 async function deleteCatalogItem(id){
   if(!confirm('確定要刪除這個服務項目嗎？')) return;
-  const { error } = await sb.from('service_catalog').delete().eq('id', id);
-  if(error){ toast('刪除失敗：' + error.message, true); return; }
-  await loadCatalog();
+  try{
+    const { error } = await sb.from('service_catalog').delete().eq('id', id);
+    if(error) throw error;
+    await loadCatalog();
+  }catch(e){
+    toast('刪除失敗：' + e.message, true);
+  }
 }
 
 /* ================= 報價單編輯器 ================= */
@@ -875,6 +926,7 @@ function renderItems(){
     body.appendChild(tr);
   });
 }
+
 function updateItem(rowId, field, value){
   const row = editorItems.find(r=>r.rowId===rowId);
   if(!row) return;
@@ -907,7 +959,10 @@ function recalcTotals(){
 function setLocked(locked){
   document.getElementById('lockedBanner').style.display = locked ? 'flex' : 'none';
   const fieldIds = ['f_issue_date','f_valid_until','f_sales_rep','f_client_name','f_contact_person','f_tax_id','f_phone','f_address','f_email','f_tax_rate','f_notes'];
-  fieldIds.forEach(id=> document.getElementById(id).disabled = locked);
+  fieldIds.forEach(id=> {
+    const el = document.getElementById(id);
+    if(el) el.disabled = locked;
+  });
   document.querySelectorAll('#itemsBody input, #itemsBody select').forEach(el=> el.disabled = locked);
   document.getElementById('saveBtn').disabled = locked;
 }
@@ -1012,9 +1067,14 @@ async function saveAsNew(){
 }
 
 async function loadQuotations(){
-  const { data, error } = await sb.from('quotations').select('*').order('created_at', { ascending:false });
-  if(error){ toast('讀取報價單列表失敗：' + error.message, true); return; }
-  quotations = data || [];
+  try{
+    const { data, error } = await sb.from('quotations').select('*').order('created_at', { ascending:false });
+    if(error) throw error;
+    quotations = data || [];
+  }catch(e){
+    console.warn('loadQuotations warning:', e);
+    quotations = [];
+  }
   renderList();
 }
 
