@@ -117,7 +117,6 @@
   .panel{display:none;max-width:1200px;margin:0 auto;}
   .panel.active{display:block;}
 
-  /* 子分頁導覽列 */
   .settings-tabs{
     display:flex;
     gap:8px;
@@ -223,7 +222,7 @@
 
   .modal-overlay{
     position:fixed;inset:0;background:rgba(16,38,42,.45);display:none;
-    align-items:center;justify-content:center;z-index:50;padding:20px;
+    align-items:center;justify-content:center;z-index:9999;padding:20px;
   }
   .modal-overlay.active{display:flex;}
   .modal{
@@ -236,7 +235,7 @@
   .modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
   
   .list-pick-item{
-    display:flex;justify-content:space-between;align-items:center;padding:11px 12px;
+    display:flex;justify-content:space-between;align-items:center;padding:12px 14px;
     border-bottom:1px solid var(--border);cursor:pointer;border-radius:4px;
   }
   .list-pick-item:hover{background:var(--brand-tint);}
@@ -246,7 +245,7 @@
 
   .toast{
     position:fixed;bottom:22px;right:22px;background:var(--ink);color:#fff;
-    padding:11px 18px;border-radius:6px;font-size:13px;z-index:100;
+    padding:11px 18px;border-radius:6px;font-size:13px;z-index:10000;
     opacity:0;transform:translateY(8px);transition:opacity .18s,transform .18s;pointer-events:none;
   }
   .toast.show{opacity:1;transform:translateY(0);}
@@ -1058,7 +1057,7 @@ function applySettingsPermissions(){
   }
 }
 
-/* ================= 個人業務資料設定（真實寫入 Supabase 資料庫） ================= */
+/* ================= 個人業務資料設定 ================= */
 async function savePersonalProfile(){
   const displayName = document.getElementById('my_display_name').value.trim();
   const phone = document.getElementById('my_phone').value.trim();
@@ -1636,6 +1635,61 @@ async function deleteCatalogItem(id){
   }
 }
 
+/* ================= 服務目錄選擇核心修復 ================= */
+function openCatalogPicker(){
+  const modal = document.getElementById('catalogModal');
+  const list = document.getElementById('catalogPickerList');
+  if(!modal || !list) {
+    alert('找不到彈窗元件，請檢查 HTML 結構');
+    return;
+  }
+  
+  list.innerHTML = '';
+  const itemsToShow = (catalog && catalog.length > 0) ? catalog : DEFAULT_CATALOG;
+
+  if(itemsToShow.length === 0){
+    list.innerHTML = '<div class="empty-state">服務目錄是空的，請先至「服務項目管理」新增</div>';
+  } else {
+    itemsToShow.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'list-pick-item';
+      div.style.cursor = 'pointer';
+      div.innerHTML = `
+        <div>
+          <div class="name" style="font-weight:600;">${escapeHtml(item.item_name)}</div>
+          <div class="meta" style="color:var(--muted);font-size:12px;">${escapeHtml(item.category)} · ${escapeHtml(item.description || '標準項目')}</div>
+        </div>
+        <span class="add-tag" style="color:var(--brand);font-weight:600;">+ 加入</span>`;
+      
+      div.onclick = (e) => {
+        e.stopPropagation();
+        addItemRow(item);
+        closeCatalogPicker();
+        toast('已加入：' + item.item_name);
+      };
+      list.appendChild(div);
+    });
+  }
+
+  modal.classList.add('active');
+}
+
+function closeCatalogPicker(){
+  document.getElementById('catalogModal').classList.remove('active');
+}
+
+/* 智慧新增項目列：若第一列是空白則直接覆蓋，否則追加至末尾 */
+function addItemRow(prefill){
+  const newRow = blankItemRow(prefill);
+  if (editorItems.length === 1 && !editorItems[0].item_name.trim()) {
+    editorItems[0] = newRow;
+  } else {
+    editorItems.push(newRow);
+  }
+  renderItems();
+  recalcTotals();
+}
+
 /* ================= 報價單編輯器 ================= */
 function blankItemRow(prefill){
   itemSeq++;
@@ -1710,11 +1764,7 @@ function updateItem(rowId, field, value){
   renderItems();
   recalcTotals();
 }
-function addItemRow(prefill){
-  editorItems.push(blankItemRow(prefill));
-  renderItems();
-  recalcTotals();
-}
+
 function removeItemRow(rowId){
   editorItems = editorItems.filter(r=>r.rowId!==rowId);
   if(editorItems.length===0) editorItems.push(blankItemRow());
