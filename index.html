@@ -37,7 +37,6 @@
   button{font-family:inherit;cursor:pointer;}
   input,select,textarea{font-family:inherit;font-size:14px;}
 
-  /* ---------- centered auth / setup screens ---------- */
   .center-screen{
     min-height:100vh;display:flex;align-items:center;justify-content:center;
     padding:24px;
@@ -82,7 +81,6 @@
   }
   .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
 
-  /* ---------- app shell ---------- */
   #app{display:none;min-height:100vh;}
   .shell{display:flex;min-height:100vh;}
   .sidebar{
@@ -123,7 +121,7 @@
     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
     padding:20px 22px;margin-bottom:18px;
   }
-  .card h2{font-size:14px;margin:0 0 16px;font-weight:700;color:var(--ink);}
+  .card h2{font-size:14px;margin:0 0 16px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:space-between;}
   .card h2 .n{color:var(--brand);margin-right:6px;font-family:'IBM Plex Mono',monospace;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
@@ -200,21 +198,22 @@
   }
   .modal-overlay.active{display:flex;}
   .modal{
-    background:#fff;border-radius:var(--radius);width:100%;max-width:560px;
+    background:#fff;border-radius:var(--radius);width:100%;max-width:600px;
     max-height:85vh;display:flex;flex-direction:column;
   }
   .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
   .modal-head h3{margin:0;font-size:14.5px;}
   .modal-body{padding:14px 20px;overflow-y:auto;}
   .modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
-  .catalog-pick-item{
-    display:flex;justify-content:space-between;align-items:center;padding:11px 10px;
+  
+  .list-pick-item{
+    display:flex;justify-content:space-between;align-items:center;padding:11px 12px;
     border-bottom:1px solid var(--border);cursor:pointer;border-radius:4px;
   }
-  .catalog-pick-item:hover{background:var(--brand-tint);}
-  .catalog-pick-item .name{font-size:13.5px;font-weight:600;}
-  .catalog-pick-item .cat{font-size:11.5px;color:var(--muted);margin-top:2px;}
-  .catalog-pick-item .add-tag{font-size:12px;color:var(--brand);font-weight:600;}
+  .list-pick-item:hover{background:var(--brand-tint);}
+  .list-pick-item .name{font-size:13.5px;font-weight:600;}
+  .list-pick-item .meta{font-size:12px;color:var(--muted);margin-top:3px;}
+  .list-pick-item .add-tag{font-size:12px;color:var(--brand);font-weight:600;}
 
   .toast{
     position:fixed;bottom:22px;right:22px;background:var(--ink);color:#fff;
@@ -261,7 +260,7 @@
 </head>
 <body>
 
-<!-- ============ 1) 連線設定（首次使用） ============ -->
+<!-- ============ 1) 連線設定 ============ -->
 <div id="setupScreen" class="center-screen" style="display:none;">
   <div class="auth-card">
     <div class="auth-brand">
@@ -322,6 +321,7 @@
     </div>
     <button class="nav-item active" data-panel="panel-editor" onclick="switchPanel('panel-editor')">📝 <span class="label">新增報價單</span></button>
     <button class="nav-item" data-panel="panel-list" onclick="switchPanel('panel-list')">📋 <span class="label">報價單列表</span></button>
+    <button class="nav-item" data-panel="panel-clients" onclick="switchPanel('panel-clients')">🏢 <span class="label">客戶資料管理</span></button>
     <button class="nav-item" data-panel="panel-catalog" onclick="switchPanel('panel-catalog')">🗂 <span class="label">服務項目管理</span></button>
     <button class="nav-item" data-panel="panel-settings" onclick="switchPanel('panel-settings')">⚙️ <span class="label">設定</span></button>
     <div class="sidebar-foot">
@@ -345,7 +345,7 @@
 
     <div class="content">
 
-      <!-- ---- 新增／編輯報價單 ---- -->
+      <!-- ---- 1. 新增／編輯報價單 ---- -->
       <div class="panel active" id="panel-editor">
         <div id="lockedBanner" class="locked-banner" style="display:none;">
           <span>🔒 此報價單狀態為「已接受」，已鎖定無法編輯。如需修改請先解鎖。</span>
@@ -357,14 +357,17 @@
           <div class="grid3">
             <div class="field"><label>開立日期</label><input type="date" id="f_issue_date"></div>
             <div class="field"><label>有效期限</label><input type="date" id="f_valid_until"></div>
-            <div class="field"><label>業務負責人</label><input type="text" id="f_sales_rep"></div>
+            <div class="field"><label>業務負責人（自動帶入）</label><input type="text" id="f_sales_rep" placeholder="填寫業務姓名"></div>
           </div>
         </div>
 
         <div class="card">
-          <h2>客戶資訊</h2>
+          <h2>
+            <span>客戶資訊</span>
+            <button class="btn btn-line btn-sm" onclick="openClientPicker()">+ 從既有客戶帶入</button>
+          </h2>
           <div class="grid2">
-            <div class="field"><label>客戶公司名稱 *</label><input type="text" id="f_client_name"></div>
+            <div class="field"><label>客戶公司名稱 *</label><input type="text" id="f_client_name" placeholder="請輸入客戶公司全銜"></div>
             <div class="field"><label>聯絡人</label><input type="text" id="f_contact_person"></div>
             <div class="field"><label>統一編號</label><input type="text" id="f_tax_id"></div>
             <div class="field"><label>電話</label><input type="text" id="f_phone"></div>
@@ -435,7 +438,7 @@
         </div>
       </div>
 
-      <!-- ---- 報價單列表 ---- -->
+      <!-- ---- 2. 報價單列表 ---- -->
       <div class="panel" id="panel-list">
         <div class="toolbar">
           <input type="text" id="searchInput" placeholder="搜尋客戶名稱或編號..." oninput="renderList()">
@@ -461,7 +464,44 @@
         </div>
       </div>
 
-      <!-- ---- 服務項目管理 ---- -->
+      <!-- ---- 3. 客戶資料管理 ---- -->
+      <div class="panel" id="panel-clients">
+        <div class="card">
+          <h2>新增客戶資料</h2>
+          <div class="grid3">
+            <div class="field"><label>客戶公司名稱 *</label><input type="text" id="cli_name"></div>
+            <div class="field"><label>聯絡人</label><input type="text" id="cli_contact"></div>
+            <div class="field"><label>統一編號</label><input type="text" id="cli_tax"></div>
+          </div>
+          <div class="grid3">
+            <div class="field"><label>電話</label><input type="text" id="cli_phone"></div>
+            <div class="field"><label>Email</label><input type="email" id="cli_email"></div>
+            <div class="field"><label>地址</label><input type="text" id="cli_address"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addNewClient()">建立客戶</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <div style="padding:14px 18px 0;">
+            <input type="text" id="cli_search" placeholder="搜尋客戶名稱、統編或聯絡人..." oninput="renderClientsList()" style="width:280px;padding:7px 10px;border:1px solid var(--border);border-radius:5px;">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>公司名稱</th>
+                <th>聯絡人</th>
+                <th>統編</th>
+                <th>電話</th>
+                <th>Email</th>
+                <th style="width:120px;text-align:center;">動作</th>
+              </tr>
+            </thead>
+            <tbody id="clientsBody"></tbody>
+          </table>
+          <div class="empty-state" id="clientsEmpty" style="display:none;">目前尚無客戶資料</div>
+        </div>
+      </div>
+
+      <!-- ---- 4. 服務項目管理 ---- -->
       <div class="panel" id="panel-catalog">
         <div class="card">
           <h2>新增服務項目</h2>
@@ -503,8 +543,19 @@
         </div>
       </div>
 
-      <!-- ---- 設定 ---- -->
+      <!-- ---- 5. 設定 ---- -->
       <div class="panel" id="panel-settings">
+        <!-- 個人帳號與業務資料設定 -->
+        <div class="card">
+          <h2>👤 個人業務資料設定</h2>
+          <div class="hint" style="margin-bottom:12px;">在此設定你的業務名稱與聯絡電話，建立新報價單時將會自動帶入「業務負責人」。</div>
+          <div class="grid2">
+            <div class="field"><label>業務姓名／顯示名稱</label><input type="text" id="my_display_name" placeholder="例如：郭楚葳 Willy"></div>
+            <div class="field"><label>業務電話 / 手機</label><input type="text" id="my_phone" placeholder="例如：0912-345-678"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="savePersonalProfile()">儲存個人資料</button>
+        </div>
+
         <!-- 管理員建立使用者功能（僅管理員顯示） -->
         <div class="card" id="adminUserCard" style="display:none;">
           <h2>👥 新增使用者帳號（管理員專用）</h2>
@@ -529,6 +580,7 @@
           <button class="btn btn-primary btn-sm" id="createUserBtn" onclick="createAccountByAdmin()">建立使用者</button>
         </div>
 
+        <!-- 公司資訊設定 -->
         <div class="card">
           <h2>公司資訊（列印於報價單上）</h2>
           <div id="settingsAdminHint" class="hint" style="margin-bottom:12px;"></div>
@@ -552,6 +604,23 @@
     </div>
   </div>
 </div>
+</div>
+
+<!-- ============ 客戶選擇 modal ============ -->
+<div class="modal-overlay" id="clientModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>從客戶資料庫帶入</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeClientPicker()">✕</button>
+    </div>
+    <div style="padding:10px 20px 0;">
+      <input type="text" id="clientPickerSearch" placeholder="快速搜尋公司名稱或統編..." oninput="renderClientPickerList()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;">
+    </div>
+    <div class="modal-body" id="clientPickerList"></div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closeClientPicker()">關閉</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ 服務目錄選擇 modal ============ -->
@@ -689,6 +758,7 @@ let currentProfile = null;
 let companySettings = { company_name:'優士國際資安股份有限公司', address:'', phone:'', tax_id:'', bank_info:'', default_tax_rate:5, quote_prefix:'QT' };
 let catalog = [];
 let quotations = [];
+let clients = [];
 let currentQuote = null;
 let itemSeq = 0;
 
@@ -805,24 +875,38 @@ function updateRoleUI(){
   }
   const userEmailEl = document.getElementById('userEmail');
   if(userEmailEl && currentUser){
-    userEmailEl.textContent = currentUser.email;
+    const displayName = currentProfile?.display_name || currentUser.email;
+    userEmailEl.textContent = displayName;
+    userEmailEl.title = currentUser.email;
   }
 }
 
 async function afterLogin(){
   try{
     let role = 'staff';
+    let profileData = null;
     if(ADMIN_EMAILS.includes(currentUser.email?.toLowerCase())){
       role = 'admin';
     }
     try{
       const { data: pById } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
-      if(pById && pById.role) role = pById.role;
+      if(pById){
+        profileData = pById;
+        if(pById.role) role = pById.role;
+      }
     }catch(err){
       console.warn('Profiles query fallback used:', err);
     }
 
-    currentProfile = { role, email: currentUser.email };
+    currentProfile = { 
+      role, 
+      email: currentUser.email,
+      display_name: profileData?.display_name || localStorage.getItem('usis_my_name') || '',
+      phone: profileData?.phone || localStorage.getItem('usis_my_phone') || ''
+    };
+
+    document.getElementById('my_display_name').value = currentProfile.display_name;
+    document.getElementById('my_phone').value = currentProfile.phone;
 
     document.getElementById('conn_url').value = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
     document.getElementById('loginScreen').style.display='none';
@@ -834,6 +918,7 @@ async function afterLogin(){
     await loadCompanySettings();
     await loadCatalog();
     await loadQuotations();
+    await loadClients();
     resetEditor();
   }catch(e){
     console.error('Fatal load error:', e);
@@ -863,6 +948,165 @@ function applySettingsPermissions(){
       ? '你是管理員，可編輯並儲存公司基本資料。'
       : '公司資訊僅管理員可修改，如需更新請聯絡管理員。';
   }
+}
+
+/* ================= 個人業務資料設定 ================= */
+async function savePersonalProfile(){
+  const displayName = document.getElementById('my_display_name').value.trim();
+  const phone = document.getElementById('my_phone').value.trim();
+
+  currentProfile.display_name = displayName;
+  currentProfile.phone = phone;
+  localStorage.setItem('usis_my_name', displayName);
+  localStorage.setItem('usis_my_phone', phone);
+
+  try{
+    await sb.from('profiles').update({
+      display_name: displayName,
+      phone: phone
+    }).eq('id', currentUser.id);
+  }catch(e){
+    console.warn('profiles update warning:', e);
+  }
+
+  updateRoleUI();
+  toast('個人業務資料已更新！');
+}
+
+/* ================= 客戶資料庫管理 ================= */
+async function loadClients(){
+  try{
+    const { data, error } = await sb.from('clients').select('*').order('company_name');
+    if(!error && data){
+      clients = data;
+    }
+  }catch(e){
+    console.warn('loadClients error:', e);
+    clients = [];
+  }
+  renderClientsList();
+}
+
+function renderClientsList(){
+  const body = document.getElementById('clientsBody');
+  const empty = document.getElementById('clientsEmpty');
+  const q = (document.getElementById('cli_search')?.value || '').toLowerCase();
+  
+  const filtered = clients.filter(c => 
+    !q || 
+    (c.company_name && c.company_name.toLowerCase().includes(q)) ||
+    (c.tax_id && c.tax_id.includes(q)) ||
+    (c.contact_person && c.contact_person.toLowerCase().includes(q))
+  );
+
+  body.innerHTML = '';
+  empty.style.display = filtered.length ? 'none' : 'block';
+
+  filtered.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${escapeHtml(c.company_name)}</b></td>
+      <td>${escapeHtml(c.contact_person || '-')}</td>
+      <td>${escapeHtml(c.tax_id || '-')}</td>
+      <td>${escapeHtml(c.phone || '-')}</td>
+      <td>${escapeHtml(c.email || '-')}</td>
+      <td style="text-align:center;">
+        <button class="btn btn-ghost btn-sm" onclick="applyClientToEditor('${c.id}')">帶入報價單</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+
+async function addNewClient(){
+  const company_name = document.getElementById('cli_name').value.trim();
+  if(!company_name){
+    toast('請輸入客戶公司名稱', true);
+    return;
+  }
+  const payload = {
+    company_name,
+    contact_person: document.getElementById('cli_contact').value.trim(),
+    tax_id: document.getElementById('cli_tax').value.trim(),
+    phone: document.getElementById('cli_phone').value.trim(),
+    email: document.getElementById('cli_email').value.trim(),
+    address: document.getElementById('cli_address').value.trim()
+  };
+
+  try{
+    const { error } = await sb.from('clients').insert(payload);
+    if(error) throw error;
+    toast('已成功建立客戶！');
+    document.getElementById('cli_name').value = '';
+    document.getElementById('cli_contact').value = '';
+    document.getElementById('cli_tax').value = '';
+    document.getElementById('cli_phone').value = '';
+    document.getElementById('cli_email').value = '';
+    document.getElementById('cli_address').value = '';
+    await loadClients();
+  }catch(e){
+    toast('新增失敗：' + e.message, true);
+  }
+}
+
+function openClientPicker(){
+  document.getElementById('clientPickerSearch').value = '';
+  renderClientPickerList();
+  document.getElementById('clientModal').classList.add('active');
+}
+function closeClientPicker(){
+  document.getElementById('clientModal').classList.remove('active');
+}
+
+function renderClientPickerList(){
+  const list = document.getElementById('clientPickerList');
+  const q = (document.getElementById('clientPickerSearch')?.value || '').toLowerCase();
+  list.innerHTML = '';
+
+  const filtered = clients.filter(c => 
+    !q || 
+    (c.company_name && c.company_name.toLowerCase().includes(q)) ||
+    (c.tax_id && c.tax_id.includes(q))
+  );
+
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="empty-state">查無客戶，可至「客戶資料管理」預先新增</div>';
+    return;
+  }
+
+  filtered.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'list-pick-item';
+    div.innerHTML = `
+      <div>
+        <div class="name">${escapeHtml(c.company_name)}</div>
+        <div class="meta">聯絡人：${escapeHtml(c.contact_person || '-')} · 統編：${escapeHtml(c.tax_id || '-')}</div>
+      </div>
+      <span class="add-tag">帶入 ➔</span>`;
+    div.onclick = () => {
+      document.getElementById('f_client_name').value = c.company_name || '';
+      document.getElementById('f_contact_person').value = c.contact_person || '';
+      document.getElementById('f_tax_id').value = c.tax_id || '';
+      document.getElementById('f_phone').value = c.phone || '';
+      document.getElementById('f_address').value = c.address || '';
+      document.getElementById('f_email').value = c.email || '';
+      closeClientPicker();
+      toast('已自動帶入客戶資料');
+    };
+    list.appendChild(div);
+  });
+}
+
+function applyClientToEditor(id){
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  document.getElementById('f_client_name').value = c.company_name || '';
+  document.getElementById('f_contact_person').value = c.contact_person || '';
+  document.getElementById('f_tax_id').value = c.tax_id || '';
+  document.getElementById('f_phone').value = c.phone || '';
+  document.getElementById('f_address').value = c.address || '';
+  document.getElementById('f_email').value = c.email || '';
+  switchPanel('panel-editor');
+  toast('已將客戶資料帶入報價單');
 }
 
 /* ================= 管理員建立帳號 ================= */
@@ -968,8 +1212,9 @@ function switchPanel(id){
   const titles = {
     'panel-editor':['新增報價單','建立報價單並存檔'],
     'panel-list':['報價單列表','檢視、搜尋與管理已建立的報價單'],
+    'panel-clients':['客戶資料管理','管理內部常用客戶與聯絡資料庫'],
     'panel-catalog':['服務項目管理','管理可重複使用的服務項目目錄'],
-    'panel-settings':['設定','公司資訊與連線設定'],
+    'panel-settings':['設定','個人資料、公司資訊與帳號設定'],
   };
   if(titles[id]){
     document.getElementById('pageTitle').textContent = titles[id][0];
@@ -977,6 +1222,7 @@ function switchPanel(id){
   }
   updateRoleUI();
   if(id === 'panel-list') renderList();
+  if(id === 'panel-clients') renderClientsList();
   if(id === 'panel-catalog') renderCatalog();
 }
 
@@ -1168,7 +1414,10 @@ function resetEditor(){
   document.getElementById('quoteNoDisplay').textContent = '自動產生';
   document.getElementById('f_issue_date').value = todayStr();
   document.getElementById('f_valid_until').value = plusDays(30);
-  document.getElementById('f_sales_rep').value = '';
+  
+  // 自動填入當前登入使用者的姓名
+  document.getElementById('f_sales_rep').value = currentProfile?.display_name || '';
+  
   document.getElementById('f_client_name').value = '';
   document.getElementById('f_contact_person').value = '';
   document.getElementById('f_tax_id').value = '';
@@ -1260,11 +1509,11 @@ function openCatalogPicker(){
   }
   catalog.forEach(item=>{
     const div = document.createElement('div');
-    div.className = 'catalog-pick-item';
+    div.className = 'list-pick-item';
     div.innerHTML = `
       <div>
         <div class="name">${escapeHtml(item.item_name)}</div>
-        <div class="cat">${escapeHtml(item.category)} · ${escapeHtml(item.description || '標準項目')}</div>
+        <div class="meta">${escapeHtml(item.category)} · ${escapeHtml(item.description || '標準項目')}</div>
       </div>
       <span class="add-tag">+ 加入</span>`;
     div.onclick = () => { addItemRow(item); closeCatalogPicker(); };
@@ -1329,6 +1578,22 @@ async function saveQuotation(){
     }));
     const { error: itemErr } = await sb.from('quotation_items').insert(itemRows);
     if(itemErr) throw itemErr;
+
+    // 同步自動加入客戶資料庫（如果尚未存在）
+    try{
+      const exists = clients.some(c => c.company_name === data.client_name);
+      if(!exists && data.client_name){
+        await sb.from('clients').insert({
+          company_name: data.client_name,
+          contact_person: data.contact_person,
+          tax_id: data.tax_id,
+          phone: data.phone,
+          address: data.address,
+          email: data.email
+        });
+        await loadClients();
+      }
+    }catch(err){}
 
     document.getElementById('quoteNoDisplay').textContent = quoteNo;
     document.getElementById('deleteBtn').style.display = data.status === 'draft' ? 'inline-flex' : 'none';
