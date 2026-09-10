@@ -467,7 +467,7 @@
       <!-- ---- 3. 客戶資料管理 ---- -->
       <div class="panel" id="panel-clients">
         <div class="card">
-          <h2>新增客戶資料</h2>
+          <h2>新增客戶資料（全員皆可建立）</h2>
           <div class="grid3">
             <div class="field"><label>客戶公司名稱 *</label><input type="text" id="cli_name"></div>
             <div class="field"><label>聯絡人</label><input type="text" id="cli_contact"></div>
@@ -492,7 +492,7 @@
                 <th>統編</th>
                 <th>電話</th>
                 <th>Email</th>
-                <th style="width:120px;text-align:center;">動作</th>
+                <th style="width:160px;text-align:center;">動作</th>
               </tr>
             </thead>
             <tbody id="clientsBody"></tbody>
@@ -545,10 +545,10 @@
 
       <!-- ---- 5. 設定 ---- -->
       <div class="panel" id="panel-settings">
-        <!-- 個人帳號與業務資料設定 -->
+        <!-- 個人業務資料設定 -->
         <div class="card">
           <h2>👤 個人業務資料設定</h2>
-          <div class="hint" style="margin-bottom:12px;">在此設定你的業務名稱與聯絡電話，建立新報價單時將會自動帶入「業務負責人」。</div>
+          <div class="hint" style="margin-bottom:12px;">設定你的業務姓名，建立新報價單時將會自動填入「業務負責人」。</div>
           <div class="grid2">
             <div class="field"><label>業務姓名／顯示名稱</label><input type="text" id="my_display_name" placeholder="例如：郭楚葳 Willy"></div>
             <div class="field"><label>業務電話 / 手機</label><input type="text" id="my_phone" placeholder="例如：0912-345-678"></div>
@@ -606,7 +606,7 @@
 </div>
 </div>
 
-<!-- ============ 客戶選擇 modal ============ -->
+<!-- ============ 客戶挑選 modal ============ -->
 <div class="modal-overlay" id="clientModal">
   <div class="modal">
     <div class="modal-head">
@@ -619,6 +619,51 @@
     <div class="modal-body" id="clientPickerList"></div>
     <div class="modal-foot">
       <button class="btn btn-line btn-sm" onclick="closeClientPicker()">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 客戶編輯 modal（管理員專用） ============ -->
+<div class="modal-overlay" id="clientEditModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>編輯客戶資料</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeClientEditor()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit_cli_id">
+      <div class="field">
+        <label>客戶公司名稱 *</label>
+        <input type="text" id="edit_cli_name">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>聯絡人</label>
+          <input type="text" id="edit_cli_contact">
+        </div>
+        <div class="field">
+          <label>統一編號</label>
+          <input type="text" id="edit_cli_tax">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>電話</label>
+          <input type="text" id="edit_cli_phone">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="edit_cli_email">
+        </div>
+      </div>
+      <div class="field">
+        <label>地址</label>
+        <input type="text" id="edit_cli_address">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closeClientEditor()">取消</button>
+      <button class="btn btn-primary btn-sm" id="editClientSaveBtn" onclick="saveClientEdit()">儲存客戶變更</button>
     </div>
   </div>
 </div>
@@ -991,6 +1036,7 @@ function renderClientsList(){
   const body = document.getElementById('clientsBody');
   const empty = document.getElementById('clientsEmpty');
   const q = (document.getElementById('cli_search')?.value || '').toLowerCase();
+  const isAdmin = currentProfile && currentProfile.role === 'admin';
   
   const filtered = clients.filter(c => 
     !q || 
@@ -1011,7 +1057,11 @@ function renderClientsList(){
       <td>${escapeHtml(c.phone || '-')}</td>
       <td>${escapeHtml(c.email || '-')}</td>
       <td style="text-align:center;">
-        <button class="btn btn-ghost btn-sm" onclick="applyClientToEditor('${c.id}')">帶入報價單</button>
+        <button class="btn btn-ghost btn-sm" onclick="applyClientToEditor('${c.id}')">帶入</button>
+        ${isAdmin ? `
+          <button class="btn btn-ghost btn-sm" onclick="openClientEditor('${c.id}')">編輯</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteClientItem('${c.id}')" style="color:var(--danger);">刪除</button>
+        ` : ''}
       </td>`;
     body.appendChild(tr);
   });
@@ -1048,6 +1098,68 @@ async function addNewClient(){
   }
 }
 
+/* 客戶編輯功能（管理員） */
+function openClientEditor(id){
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  document.getElementById('edit_cli_id').value = c.id;
+  document.getElementById('edit_cli_name').value = c.company_name || '';
+  document.getElementById('edit_cli_contact').value = c.contact_person || '';
+  document.getElementById('edit_cli_tax').value = c.tax_id || '';
+  document.getElementById('edit_cli_phone').value = c.phone || '';
+  document.getElementById('edit_cli_email').value = c.email || '';
+  document.getElementById('edit_cli_address').value = c.address || '';
+  document.getElementById('clientEditModal').classList.add('active');
+}
+
+function closeClientEditor(){
+  document.getElementById('clientEditModal').classList.remove('active');
+}
+
+async function saveClientEdit(){
+  const id = document.getElementById('edit_cli_id').value;
+  const company_name = document.getElementById('edit_cli_name').value.trim();
+  if(!company_name){
+    toast('請填寫客戶公司名稱', true);
+    return;
+  }
+  const payload = {
+    company_name,
+    contact_person: document.getElementById('edit_cli_contact').value.trim(),
+    tax_id: document.getElementById('edit_cli_tax').value.trim(),
+    phone: document.getElementById('edit_cli_phone').value.trim(),
+    email: document.getElementById('edit_cli_email').value.trim(),
+    address: document.getElementById('edit_cli_address').value.trim()
+  };
+
+  const btn = document.getElementById('editClientSaveBtn');
+  btn.disabled = true; btn.textContent = '儲存中...';
+
+  try{
+    const { error } = await sb.from('clients').update(payload).eq('id', id);
+    if(error) throw error;
+    toast('客戶資料已更新！');
+    closeClientEditor();
+    await loadClients();
+  }catch(e){
+    toast('更新失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false; btn.textContent = '儲存客戶變更';
+  }
+}
+
+async function deleteClientItem(id){
+  if(!confirm('確定要刪除這筆客戶資料嗎？此動作無法復原。')) return;
+  try{
+    const { error } = await sb.from('clients').delete().eq('id', id);
+    if(error) throw error;
+    toast('已成功刪除客戶');
+    await loadClients();
+  }catch(e){
+    toast('刪除失敗：' + e.message, true);
+  }
+}
+
 function openClientPicker(){
   document.getElementById('clientPickerSearch').value = '';
   renderClientPickerList();
@@ -1065,7 +1177,8 @@ function renderClientPickerList(){
   const filtered = clients.filter(c => 
     !q || 
     (c.company_name && c.company_name.toLowerCase().includes(q)) ||
-    (c.tax_id && c.tax_id.includes(q))
+    (c.tax_id && c.tax_id.includes(q)) ||
+    (c.contact_person && c.contact_person.toLowerCase().includes(q))
   );
 
   if(filtered.length === 0){
@@ -1415,7 +1528,6 @@ function resetEditor(){
   document.getElementById('f_issue_date').value = todayStr();
   document.getElementById('f_valid_until').value = plusDays(30);
   
-  // 自動填入當前登入使用者的姓名
   document.getElementById('f_sales_rep').value = currentProfile?.display_name || '';
   
   document.getElementById('f_client_name').value = '';
@@ -1501,28 +1613,6 @@ function setLocked(locked){
   document.getElementById('saveBtn').disabled = locked;
 }
 
-function openCatalogPicker(){
-  const list = document.getElementById('catalogPickerList');
-  list.innerHTML = '';
-  if(catalog.length === 0){
-    list.innerHTML = '<div class="empty-state">服務目錄是空的，請先至管理頁新增</div>';
-  }
-  catalog.forEach(item=>{
-    const div = document.createElement('div');
-    div.className = 'list-pick-item';
-    div.innerHTML = `
-      <div>
-        <div class="name">${escapeHtml(item.item_name)}</div>
-        <div class="meta">${escapeHtml(item.category)} · ${escapeHtml(item.description || '標準項目')}</div>
-      </div>
-      <span class="add-tag">+ 加入</span>`;
-    div.onclick = () => { addItemRow(item); closeCatalogPicker(); };
-    list.appendChild(div);
-  });
-  document.getElementById('catalogModal').classList.add('active');
-}
-function closeCatalogPicker(){ document.getElementById('catalogModal').classList.remove('active'); }
-
 /* ================= 儲存 / 讀取 / 刪除 報價單 ================= */
 function collectFormData(){
   const { subtotal, tax, total, taxRate } = recalcTotals();
@@ -1579,7 +1669,7 @@ async function saveQuotation(){
     const { error: itemErr } = await sb.from('quotation_items').insert(itemRows);
     if(itemErr) throw itemErr;
 
-    // 同步自動加入客戶資料庫（如果尚未存在）
+    // 若為新客戶，自動收納至資料庫
     try{
       const exists = clients.some(c => c.company_name === data.client_name);
       if(!exists && data.client_name){
