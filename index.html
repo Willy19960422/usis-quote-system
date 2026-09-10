@@ -43,18 +43,14 @@
     padding:24px;
   }
   .auth-card{
-    width:100%;max-width:380px;background:var(--surface);
+    width:100%;max-width:400px;background:var(--surface);
     border:1px solid var(--border);border-radius:var(--radius);
     padding:36px 32px;
   }
-  .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
-  .auth-brand .mark{
-    width:34px;height:34px;border-radius:8px;background:var(--brand);
-    display:flex;align-items:center;justify-content:center;color:#fff;
-    font-weight:700;font-size:15px;flex:none;
-  }
-  .auth-brand .title{font-weight:700;font-size:16px;letter-spacing:.02em;}
-  .auth-brand .sub{font-size:12px;color:var(--muted);}
+  .auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+  .auth-brand .logo-img{width:42px;height:42px;object-fit:contain;flex:none;}
+  .auth-brand .title{font-weight:700;font-size:16.5px;letter-spacing:.02em;color:var(--ink);}
+  .auth-brand .sub{font-size:12px;color:var(--muted);margin-top:2px;}
   .field{margin-bottom:16px;}
   .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;}
   .field input, .field select, .field textarea{
@@ -89,14 +85,11 @@
   #app{display:none;min-height:100vh;}
   .shell{display:flex;min-height:100vh;}
   .sidebar{
-    width:216px;flex:none;background:var(--ink);color:#cfe3e2;
+    width:220px;flex:none;background:var(--ink);color:#cfe3e2;
     display:flex;flex-direction:column;padding:20px 14px;
   }
   .sidebar .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 22px;}
-  .sidebar .brand .mark{
-    width:30px;height:30px;border-radius:7px;background:var(--brand);
-    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;
-  }
+  .sidebar .brand .logo-img{width:32px;height:32px;object-fit:contain;}
   .sidebar .brand .title{color:#fff;font-weight:700;font-size:14.5px;}
   .sidebar .brand .sub{font-size:10.5px;color:#7ea3a1;}
   .nav-item{
@@ -108,9 +101,10 @@
   .sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);}
   .user-chip{padding:8px;font-size:12px;color:#9fc0be;line-height:1.5;}
   .user-chip .role{
-    display:inline-block;font-size:10px;background:rgba(255,255,255,.1);
-    padding:1px 7px;border-radius:10px;margin-top:3px;color:#cfe3e2;
+    display:inline-block;font-size:10.5px;background:rgba(255,255,255,.12);
+    padding:2px 8px;border-radius:10px;margin-top:4px;color:#e3f0f1;font-weight:600;
   }
+  .user-chip .role.admin{background:var(--brand);color:#fff;}
 
   .main{flex:1;min-width:0;display:flex;flex-direction:column;}
   .topbar{
@@ -185,20 +179,21 @@
   }
   .modal-overlay.active{display:flex;}
   .modal{
-    background:#fff;border-radius:var(--radius);width:100%;max-width:520px;
-    max-height:80vh;display:flex;flex-direction:column;
+    background:#fff;border-radius:var(--radius);width:100%;max-width:560px;
+    max-height:82vh;display:flex;flex-direction:column;
   }
   .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
   .modal-head h3{margin:0;font-size:14.5px;}
-  .modal-body{padding:6px 12px;overflow-y:auto;}
+  .modal-body{padding:8px 14px;overflow-y:auto;}
   .modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
   .catalog-pick-item{
-    display:flex;justify-content:space-between;align-items:center;padding:10px 8px;
-    border-bottom:1px solid var(--border);cursor:pointer;
+    display:flex;justify-content:space-between;align-items:center;padding:11px 10px;
+    border-bottom:1px solid var(--border);cursor:pointer;border-radius:4px;
   }
   .catalog-pick-item:hover{background:var(--brand-tint);}
-  .catalog-pick-item .name{font-size:13.5px;}
-  .catalog-pick-item .cat{font-size:11px;color:var(--muted);}
+  .catalog-pick-item .name{font-size:13.5px;font-weight:600;}
+  .catalog-pick-item .cat{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .catalog-pick-item .add-tag{font-size:12px;color:var(--brand);font-weight:600;}
 
   .toast{
     position:fixed;bottom:22px;right:22px;background:var(--ink);color:#fff;
@@ -214,9 +209,11 @@
     body *{visibility:hidden;}
     #printArea, #printArea *{visibility:visible;}
     #printArea{display:block;position:absolute;top:0;left:0;width:100%;padding:14mm;}
-    .p-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--brand);padding-bottom:14px;margin-bottom:18px;}
-    .p-head h1{font-size:20px;margin:0 0 4px;color:var(--brand-dark);}
-    .p-head .co{font-size:12px;color:#333;line-height:1.6;}
+    .p-head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid var(--brand);padding-bottom:14px;margin-bottom:18px;}
+    .p-logo-wrap{display:flex;align-items:center;gap:14px;}
+    .p-logo-wrap img{width:56px;height:56px;object-fit:contain;}
+    .p-head h1{font-size:19px;margin:0 0 4px;color:var(--brand-dark);}
+    .p-head .co{font-size:11.5px;color:#333;line-height:1.6;}
     .p-head .qmeta{text-align:right;font-size:12px;line-height:1.7;}
     .p-head .qmeta .no{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;}
     .p-client{margin-bottom:16px;font-size:12.5px;line-height:1.8;}
@@ -246,7 +243,7 @@
 <div id="setupScreen" class="center-screen">
   <div class="auth-card">
     <div class="auth-brand">
-      <div class="mark">US</div>
+      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" class="logo-img" alt="USIS">
       <div>
         <div class="title">USIS 報價單系統</div>
         <div class="sub">首次使用 — 連接 Supabase</div>
@@ -262,7 +259,7 @@
       <input type="text" id="setupKey" placeholder="eyJhbGciOi...">
     </div>
     <button class="btn btn-primary" onclick="saveConnection()">儲存並連線</button>
-    <div class="hint">這組設定只會存在這台瀏覽器（localStorage），不會上傳。網址與 anon key 可在 Supabase 專案的 Settings → API 找到。帳號請由管理員在 Supabase 後台的 Authentication 建立，本系統不提供自行註冊。</div>
+    <div class="hint">這組設定只會存在瀏覽器（localStorage），不會外流。帳號請由管理員在 Supabase 後台建立。</div>
   </div>
 </div>
 
@@ -270,7 +267,7 @@
 <div id="loginScreen" class="center-screen" style="display:none;">
   <div class="auth-card">
     <div class="auth-brand">
-      <div class="mark">US</div>
+      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" class="logo-img" alt="USIS">
       <div>
         <div class="title">USIS 報價單系統</div>
         <div class="sub">請登入以繼續</div>
@@ -286,7 +283,7 @@
       <input type="password" id="loginPassword" autocomplete="current-password">
     </div>
     <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">登入</button>
-    <div class="hint">尚未有帳號？請洽系統管理員於後台建立，本系統不開放自行註冊。</div>
+    <div class="hint">尚未有帳號？請洽系統管理員於後台建立。</div>
     <div class="hint" style="margin-top:14px;"><a href="#" onclick="showSetup();return false;" style="color:var(--muted);">重新設定連線</a></div>
   </div>
 </div>
@@ -296,7 +293,7 @@
 <div class="shell">
   <div class="sidebar">
     <div class="brand">
-      <div class="mark">US</div>
+      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" class="logo-img" alt="USIS">
       <div>
         <div class="title">USIS 報價單</div>
         <div class="sub">Quotation System</div>
@@ -309,7 +306,7 @@
     <div class="sidebar-foot">
       <div class="user-chip">
         <div id="userEmail">-</div>
-        <span class="role" id="userRole">staff</span>
+        <span class="role" id="userRole">一般人員</span>
       </div>
       <button class="nav-item" onclick="doLogout()">↩ <span class="label">登出</span></button>
     </div>
@@ -359,7 +356,7 @@
           <table class="items-table">
             <thead>
               <tr>
-                <th style="width:110px;">類別</th>
+                <th style="width:120px;">類別</th>
                 <th>項目名稱</th>
                 <th>說明</th>
                 <th style="width:64px;">單位</th>
@@ -396,7 +393,7 @@
           <div class="grid2" style="margin-top:14px;">
             <div class="field" style="margin-bottom:0;">
               <label>狀態</label>
-              <select id="f_status" onchange="onStatusChange()">
+              <select id="f_status">
                 <option value="draft">草稿</option>
                 <option value="sent">已送出</option>
                 <option value="accepted">已接受</option>
@@ -449,13 +446,19 @@
           <div class="grid3">
             <div class="field">
               <label>類別</label>
-              <select id="c_category"><option>ISO驗證</option><option>資安服務</option><option>其他</option></select>
+              <select id="c_category">
+                <option>ISO驗證</option>
+                <option>資安服務</option>
+                <option>個人資料保護</option>
+                <option>法規與標準</option>
+                <option>其他</option>
+              </select>
             </div>
             <div class="field"><label>項目名稱</label><input type="text" id="c_name"></div>
             <div class="field"><label>單位</label><input type="text" id="c_unit" value="式"></div>
           </div>
           <div class="grid2">
-            <div class="field"><label>說明</label><input type="text" id="c_desc"></div>
+            <div class="field"><label>說明（標準代號等）</label><input type="text" id="c_desc"></div>
             <div class="field"><label>參考單價</label><input type="number" id="c_price" value="0"></div>
           </div>
           <button class="btn btn-primary btn-sm" onclick="addCatalogItem()">新增到目錄</button>
@@ -465,7 +468,7 @@
             <thead><tr><th>類別</th><th>項目名稱</th><th>說明</th><th>單位</th><th>參考單價</th><th style="width:70px;"></th></tr></thead>
             <tbody id="catalogBody"></tbody>
           </table>
-          <div class="empty-state" id="catalogEmpty" style="display:none;">目錄目前是空的，above 表單新增項目</div>
+          <div class="empty-state" id="catalogEmpty" style="display:none;">目錄目前是空的</div>
         </div>
       </div>
 
@@ -505,12 +508,15 @@
   </div>
 </div>
 
-<!-- ============ 列印用內容（畫面上隱藏，只在列印時顯示） ============ -->
+<!-- ============ 列印用內容 ============ -->
 <div id="printArea">
   <div class="p-head">
-    <div>
-      <h1 id="p_company_name">優士國際資安股份有限公司</h1>
-      <div class="co" id="p_company_meta"></div>
+    <div class="p-logo-wrap">
+      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" alt="USIS Logo">
+      <div>
+        <h1 id="p_company_name">優士國際資安股份有限公司</h1>
+        <div class="co" id="p_company_meta"></div>
+      </div>
     </div>
     <div class="qmeta">
       <div>報 價 單</div>
@@ -539,18 +545,32 @@
 
 <script>
 /* ================= 狀態與初始化 ================= */
-// 預設連線資訊（USIS 報價單系統專用的 Supabase 專案）
-// anon key 設計上就是可以放在前端的公開金鑰，真正的存取控制是資料庫的 RLS
-// 規則（只有登入帳號能讀寫）＋ 系統不開放自行註冊。
 const DEFAULT_SB_URL = 'https://jkhdalsqdjugcweepvmt.supabase.co';
 const DEFAULT_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpraGRhbHNxZGp1Z2N3ZWVwdm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5ODc4MDcsImV4cCI6MjEwNDU2MzgwN30.ryURSFwu5gEYwk0gqvFgdP-fP-7jlN3ReH37CbzKW8o';
+
+// 產品清單預設資料庫
+const DEFAULT_CATALOG = [
+  { category:'ISO驗證', item_name:'資訊安全管理系統', description:'ISO/IEC 27001 · ISMS', unit:'式', default_price:0 },
+  { category:'個人資料保護', item_name:'隱私資訊管理系統', description:'ISO/IEC 27701 · PIMS', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'人工智慧管理系統', description:'ISO/IEC 42001 · AIMS', unit:'式', default_price:0 },
+  { category:'法規與標準', item_name:'歐盟網路韌性法案', description:'Cyber Resilience Act · CRA', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'雲端服務資訊安全', description:'ISO/IEC 27017', unit:'式', default_price:0 },
+  { category:'個人資料保護', item_name:'雲端服務個人資料保護', description:'ISO/IEC 27018', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'資訊科技服務管理系統', description:'ISO/IEC 20000 · ITSMS', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'營運持續管理系統', description:'ISO 22301 · BCMS', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'實驗室品質管理系統', description:'ISO/IEC 17025', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'資訊技術安全評估準則', description:'ISO/IEC 15408 · CC', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'密碼模組安全需求', description:'ISO 19790 · FIPS 140-3', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'工控資安防護', description:'IEC 62443-2-1', unit:'式', default_price:0 }
+];
+
 let sb = null;
 let currentUser = null;
 let currentProfile = null;
 let companySettings = { company_name:'優士國際資安股份有限公司', address:'', phone:'', tax_id:'', bank_info:'', default_tax_rate:5, quote_prefix:'QT' };
 let catalog = [];
 let quotations = [];
-let currentQuote = null; // { id, ... } null = new
+let currentQuote = null;
 let itemSeq = 0;
 
 const STATUS_LABEL = { draft:'草稿', sent:'已送出', accepted:'已接受', rejected:'已拒絕', expired:'已過期' };
@@ -630,7 +650,7 @@ async function doLogin(){
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   btn.disabled = false; btn.textContent = '登入';
   if(error){
-    errEl.innerHTML = '<div class="error-msg">登入失敗：帳號或密碼錯誤，或此帳號尚未由管理員建立</div>';
+    errEl.innerHTML = '<div class="error-msg">登入失敗：帳號或密碼錯誤，或此帳號尚未建立</div>';
     return;
   }
   currentUser = data.user;
@@ -647,13 +667,27 @@ async function doLogout(){
 }
 
 async function afterLogin(){
-  // 讀取個人 profile（角色）
-  const { data:profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
-  currentProfile = profile || { role:'staff', email: currentUser.email };
-  document.getElementById('userEmail').textContent = currentUser.email;
-  document.getElementById('userRole').textContent = currentProfile.role === 'admin' ? '管理員' : '一般人員';
-  document.getElementById('conn_url').value = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
+  // 修正角色抓取問題：先以 id 查，查不到則以 email 查，並印出 debug 訊息
+  let profile = null;
+  const { data: pById, error: errById } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  if(pById){
+    profile = pById;
+  } else {
+    if(errById) console.warn('profiles query by id error:', errById);
+    const { data: pByEmail, error: errByEmail } = await sb.from('profiles').select('*').eq('email', currentUser.email).maybeSingle();
+    if(pByEmail) profile = pByEmail;
+    else if(errByEmail) console.warn('profiles query by email error:', errByEmail);
+  }
 
+  currentProfile = profile || { role:'staff', email: currentUser.email };
+  const isAdmin = currentProfile.role === 'admin';
+
+  document.getElementById('userEmail').textContent = currentUser.email;
+  const roleEl = document.getElementById('userRole');
+  roleEl.textContent = isAdmin ? '管理員' : '一般人員';
+  roleEl.className = 'role' + (isAdmin ? ' admin' : '');
+
+  document.getElementById('conn_url').value = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
 
@@ -670,7 +704,7 @@ function applySettingsPermissions(){
   ids.forEach(id => document.getElementById(id).disabled = !isAdmin);
   document.getElementById('settingsSaveBtn').style.display = isAdmin ? 'inline-flex' : 'none';
   document.getElementById('settingsAdminHint').textContent = isAdmin
-    ? '你是管理員，可以修改公司資訊。'
+    ? '你是管理員，可編輯並儲存公司基本資料。'
     : '公司資訊僅管理員可修改，如需更新請聯絡管理員。';
 }
 
@@ -694,7 +728,7 @@ function switchPanel(id){
 
 /* ================= 公司設定 ================= */
 async function loadCompanySettings(){
-  const { data, error } = await sb.from('company_settings').select('*').eq('id',1).maybeSingle();
+  const { data } = await sb.from('company_settings').select('*').eq('id',1).maybeSingle();
   if(data) companySettings = data;
   document.getElementById('s_company_name').value = companySettings.company_name||'';
   document.getElementById('s_tax_id').value = companySettings.tax_id||'';
@@ -714,7 +748,7 @@ async function saveCompanySettings(){
     quote_prefix: document.getElementById('s_prefix').value.trim() || 'QT',
     bank_info: document.getElementById('s_bank').value.trim(),
   };
-  const { error } = await sb.from('company_settings').update(payload).eq('id',1);
+  const { error } = await sb.from('company_settings').upsert(payload);
   if(error){ toast('儲存失敗：' + error.message, true); return; }
   companySettings = {...companySettings, ...payload};
   toast('公司設定已儲存');
@@ -723,9 +757,20 @@ async function saveCompanySettings(){
 /* ================= 服務目錄 ================= */
 async function loadCatalog(){
   const { data, error } = await sb.from('service_catalog').select('*').order('sort_order');
-  catalog = data || [];
+  if(!error && data && data.length > 0){
+    catalog = data;
+  }else{
+    // 若資料庫為空，自動載入 12 項標準服務
+    catalog = [...DEFAULT_CATALOG];
+    if(sb){
+      await sb.from('service_catalog').insert(
+        DEFAULT_CATALOG.map((item, idx) => ({ ...item, sort_order: idx + 1 }))
+      );
+    }
+  }
   renderCatalog();
 }
+
 function renderCatalog(){
   const body = document.getElementById('catalogBody');
   body.innerHTML = '';
@@ -734,11 +779,11 @@ function renderCatalog(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(item.category)}</td>
-      <td>${escapeHtml(item.item_name)}</td>
+      <td><b>${escapeHtml(item.item_name)}</b></td>
       <td>${escapeHtml(item.description||'')}</td>
       <td>${escapeHtml(item.unit||'式')}</td>
       <td class="num">${money(item.default_price)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')">刪除</button></td>`;
+      <td>${item.id ? `<button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')">刪除</button>` : ''}</td>`;
     body.appendChild(tr);
   });
 }
@@ -772,7 +817,15 @@ async function deleteCatalogItem(id){
 function blankItemRow(prefill){
   itemSeq++;
   const id = 'row_' + itemSeq;
-  return { rowId:id, category: prefill?.category || 'ISO驗證', item_name: prefill?.item_name || '', description: prefill?.description || '', unit: prefill?.unit || '式', quantity: 1, unit_price: prefill?.default_price || 0 };
+  return { 
+    rowId: id, 
+    category: prefill?.category || 'ISO驗證', 
+    item_name: prefill?.item_name || '', 
+    description: prefill?.description || '', 
+    unit: prefill?.unit || '式', 
+    quantity: 1, 
+    unit_price: prefill?.default_price || 0 
+  };
 }
 let editorItems = [];
 
@@ -809,10 +862,12 @@ function renderItems(){
       <td><select onchange="updateItem('${row.rowId}','category',this.value)">
         <option value="ISO驗證">ISO驗證</option>
         <option value="資安服務">資安服務</option>
+        <option value="個人資料保護">個人資料保護</option>
+        <option value="法規與標準">法規與標準</option>
         <option value="其他">其他</option>
       </select></td>
-      <td><input type="text" value="${escapeAttr(row.item_name)}" onchange="updateItem('${row.rowId}','item_name',this.value)"></td>
-      <td><input type="text" value="${escapeAttr(row.description)}" onchange="updateItem('${row.rowId}','description',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(row.item_name)}" placeholder="項目名稱" onchange="updateItem('${row.rowId}','item_name',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(row.description)}" placeholder="規格/說明" onchange="updateItem('${row.rowId}','description',this.value)"></td>
       <td><input type="text" value="${escapeAttr(row.unit)}" onchange="updateItem('${row.rowId}','unit',this.value)"></td>
       <td class="num-col"><input type="number" class="qty" value="${row.quantity}" min="0" onchange="updateItem('${row.rowId}','quantity',this.value)"></td>
       <td class="num-col"><input type="number" class="price" value="${row.unit_price}" min="0" onchange="updateItem('${row.rowId}','unit_price',this.value)"></td>
@@ -859,21 +914,21 @@ function setLocked(locked){
   document.getElementById('saveBtn').disabled = locked;
 }
 
-function onStatusChange(){
-  // 提示：選擇「已接受」並儲存後將自動鎖定
-}
-
-/* 從服務目錄挑選加入報價單 */
 function openCatalogPicker(){
   const list = document.getElementById('catalogPickerList');
   list.innerHTML = '';
   if(catalog.length === 0){
-    list.innerHTML = '<div class="empty-state">服務目錄是空的，請先到「服務項目管理」新增</div>';
+    list.innerHTML = '<div class="empty-state">服務目錄是空的，請先至管理頁新增</div>';
   }
   catalog.forEach(item=>{
     const div = document.createElement('div');
     div.className = 'catalog-pick-item';
-    div.innerHTML = `<div><div class="name">${escapeHtml(item.item_name)}</div><div class="cat">${escapeHtml(item.category)} · ${money(item.default_price)}</div></div><span>+ 加入</span>`;
+    div.innerHTML = `
+      <div>
+        <div class="name">${escapeHtml(item.item_name)}</div>
+        <div class="cat">${escapeHtml(item.category)} · ${escapeHtml(item.description || '標準項目')}</div>
+      </div>
+      <span class="add-tag">+ 加入</span>`;
     div.onclick = () => { addItemRow(item); closeCatalogPicker(); };
     list.appendChild(div);
   });
@@ -1064,21 +1119,21 @@ function printQuotation(){
   const data = collectFormData();
   document.getElementById('p_company_name').textContent = companySettings.company_name || '';
   const metaParts = [companySettings.address, companySettings.phone ? '電話：'+companySettings.phone : '', companySettings.tax_id ? '統編：'+companySettings.tax_id : ''].filter(Boolean);
-  document.getElementById('p_company_meta').textContent = metaParts.join('　');
+  document.getElementById('p_company_meta').textContent = metaParts.join(' ');
   document.getElementById('p_quote_no').textContent = currentQuote ? currentQuote.quote_no : '（尚未儲存）';
-  document.getElementById('p_dates').textContent = `開立日期：${data.issue_date}　有效期限：${data.valid_until||'-'}`;
+  document.getElementById('p_dates').textContent = `開立日期：${data.issue_date} 有效期限：${data.valid_until||'-'}`;
 
   document.getElementById('p_client').innerHTML = `
     <b>${escapeHtml(data.client_name||'')}</b><br>
-    聯絡人：${escapeHtml(data.contact_person||'-')}　統編：${escapeHtml(data.tax_id||'-')}<br>
+    聯絡人：${escapeHtml(data.contact_person||'-')} 統編：${escapeHtml(data.tax_id||'-')}<br>
     地址：${escapeHtml(data.address||'-')}<br>
-    電話：${escapeHtml(data.phone||'-')}　Email：${escapeHtml(data.email||'-')}`;
+    電話：${escapeHtml(data.phone||'-')} Email：${escapeHtml(data.email||'-')}`;
 
   const itemsBody = document.getElementById('p_items');
   itemsBody.innerHTML = '';
   editorItems.filter(r=>r.item_name.trim()).forEach(r=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHtml(r.item_name)}</td><td>${escapeHtml(r.description)}</td><td>${escapeHtml(r.unit)}</td><td>${r.quantity}</td><td>${money(r.unit_price)}</td><td>${money(r.quantity*r.unit_price)}</td>`;
+    tr.innerHTML = `<td><b>${escapeHtml(r.item_name)}</b></td><td>${escapeHtml(r.description)}</td><td>${escapeHtml(r.unit)}</td><td>${r.quantity}</td><td>${money(r.unit_price)}</td><td>${money(r.quantity*r.unit_price)}</td>`;
     itemsBody.appendChild(tr);
   });
   document.getElementById('p_subtotal').textContent = money(data.subtotal);
