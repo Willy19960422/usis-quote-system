@@ -136,7 +136,6 @@
   td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
   tr:last-child td{border-bottom:none;}
   
-  /* 服務項目表格精準比例排版 */
   .items-table{width:100%;table-layout:fixed;}
   .items-table th:nth-child(1){width:130px;}
   .items-table th:nth-child(2){width:24%;}
@@ -202,11 +201,11 @@
   .modal-overlay.active{display:flex;}
   .modal{
     background:#fff;border-radius:var(--radius);width:100%;max-width:560px;
-    max-height:82vh;display:flex;flex-direction:column;
+    max-height:85vh;display:flex;flex-direction:column;
   }
   .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
   .modal-head h3{margin:0;font-size:14.5px;}
-  .modal-body{padding:8px 14px;overflow-y:auto;}
+  .modal-body{padding:14px 20px;overflow-y:auto;}
   .modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
   .catalog-pick-item{
     display:flex;justify-content:space-between;align-items:center;padding:11px 10px;
@@ -487,7 +486,16 @@
         </div>
         <div class="card" style="padding:0;">
           <table>
-            <thead><tr><th>類別</th><th>項目名稱</th><th>說明</th><th>單位</th><th>參考單價</th><th style="width:70px;"></th></tr></thead>
+            <thead>
+              <tr>
+                <th style="width:140px;">類別</th>
+                <th style="width:28%;">項目名稱</th>
+                <th>說明</th>
+                <th style="width:70px;">單位</th>
+                <th style="width:120px;text-align:right;">參考單價</th>
+                <th style="width:120px;text-align:center;">動作</th>
+              </tr>
+            </thead>
             <tbody id="catalogBody"></tbody>
           </table>
           <div class="empty-state" id="catalogEmpty" style="display:none;">目錄目前是空的</div>
@@ -527,6 +535,48 @@
     <div class="modal-head"><h3>從服務目錄選擇項目</h3><button class="btn btn-ghost btn-sm" onclick="closeCatalogPicker()">✕</button></div>
     <div class="modal-body" id="catalogPickerList"></div>
     <div class="modal-foot"><button class="btn btn-line btn-sm" onclick="closeCatalogPicker()">關閉</button></div>
+  </div>
+</div>
+
+<!-- ============ 服務目錄編輯 modal ============ -->
+<div class="modal-overlay" id="catalogEditModal">
+  <div class="modal">
+    <div class="modal-head"><h3>編輯服務項目</h3><button class="btn btn-ghost btn-sm" onclick="closeCatalogEditor()">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit_c_id">
+      <div class="field">
+        <label>類別</label>
+        <select id="edit_c_category">
+          <option>ISO驗證</option>
+          <option>資安服務</option>
+          <option>個人資料保護</option>
+          <option>法規與標準</option>
+          <option>其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>項目名稱 *</label>
+        <input type="text" id="edit_c_name">
+      </div>
+      <div class="field">
+        <label>說明（標準代號等）</label>
+        <input type="text" id="edit_c_desc">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>單位</label>
+          <input type="text" id="edit_c_unit">
+        </div>
+        <div class="field">
+          <label>參考單價</label>
+          <input type="number" id="edit_c_price">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closeCatalogEditor()">取消</button>
+      <button class="btn btn-primary btn-sm" id="editCatalogSaveBtn" onclick="saveCatalogEdit()">儲存變更</button>
+    </div>
   </div>
 </div>
 
@@ -842,7 +892,10 @@ function renderCatalog(){
       <td>${escapeHtml(item.description||'')}</td>
       <td>${escapeHtml(item.unit||'式')}</td>
       <td class="num" style="text-align:right;">${money(item.default_price)}</td>
-      <td>${item.id ? `<button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')">刪除</button>` : ''}</td>`;
+      <td style="text-align:center;">
+        <button class="btn btn-ghost btn-sm" onclick="openCatalogEditor('${item.id}')">編輯</button>
+        ${item.id ? `<button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')" style="color:var(--danger);">刪除</button>` : ''}
+      </td>`;
     body.appendChild(tr);
   });
 }
@@ -871,12 +924,72 @@ async function addCatalogItem(){
   }
 }
 
+/* 開啟與儲存編輯服務項目 */
+function openCatalogEditor(id){
+  const item = catalog.find(x => String(x.id) === String(id));
+  if(!item){
+    toast('找不到該項目', true);
+    return;
+  }
+  document.getElementById('edit_c_id').value = item.id || '';
+  document.getElementById('edit_c_category').value = item.category || 'ISO驗證';
+  document.getElementById('edit_c_name').value = item.item_name || '';
+  document.getElementById('edit_c_desc').value = item.description || '';
+  document.getElementById('edit_c_unit').value = item.unit || '式';
+  document.getElementById('edit_c_price').value = item.default_price || 0;
+  
+  document.getElementById('catalogEditModal').classList.add('active');
+}
+
+function closeCatalogEditor(){
+  document.getElementById('catalogEditModal').classList.remove('active');
+}
+
+async function saveCatalogEdit(){
+  const id = document.getElementById('edit_c_id').value;
+  const item_name = document.getElementById('edit_c_name').value.trim();
+  if(!item_name){
+    toast('請輸入項目名稱', true);
+    return;
+  }
+  const payload = {
+    category: document.getElementById('edit_c_category').value,
+    item_name,
+    description: document.getElementById('edit_c_desc').value.trim(),
+    unit: document.getElementById('edit_c_unit').value.trim() || '式',
+    default_price: Number(document.getElementById('edit_c_price').value) || 0,
+  };
+
+  const btn = document.getElementById('editCatalogSaveBtn');
+  btn.disabled = true;
+  btn.textContent = '儲存中...';
+
+  try{
+    if(id){
+      const { error } = await sb.from('service_catalog').update(payload).eq('id', id);
+      if(error) throw error;
+    } else {
+      const idx = catalog.findIndex(x => !x.id && x.item_name === item_name);
+      if(idx > -1) catalog[idx] = { ...catalog[idx], ...payload };
+    }
+    toast('服務項目已更新');
+    closeCatalogEditor();
+    await loadCatalog();
+  }catch(e){
+    toast('更新失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '儲存變更';
+  }
+}
+
 async function deleteCatalogItem(id){
   if(!confirm('確定要刪除這個服務項目嗎？')) return;
   try{
     const { error } = await sb.from('service_catalog').delete().eq('id', id);
     if(error) throw error;
     await loadCatalog();
+    toast('已刪除服務項目');
   }catch(e){
     toast('刪除失敗：' + e.message, true);
   }
