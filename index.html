@@ -281,7 +281,7 @@
       <input type="text" id="setupKey" placeholder="eyJhbGciOi...">
     </div>
     <button class="btn btn-primary" onclick="saveConnection()" style="width:100%;">儲存並連線</button>
-    <div class="hint">這組設定只會存在瀏覽器（localStorage），不會外流。帳號請由管理員在 Supabase 後台建立。</div>
+    <div class="hint">這組設定只會存在瀏覽器（localStorage），不會外流。</div>
   </div>
 </div>
 
@@ -305,7 +305,7 @@
       <input type="password" id="loginPassword" autocomplete="current-password">
     </div>
     <button class="btn btn-primary" onclick="doLogin()" id="loginBtn" style="width:100%;">登入</button>
-    <div class="hint">尚未有帳號？請洽系統管理員於後台建立，本系統不開放自行註冊。</div>
+    <div class="hint">尚未有帳號？請洽系統管理員建立。</div>
   </div>
 </div>
 
@@ -329,6 +329,7 @@
         <div id="userEmail">-</div>
         <span class="role" id="userRole">一般人員</span>
       </div>
+      <button class="nav-item" onclick="openPasswordModal()">🔑 <span class="label">修改密碼</span></button>
       <button class="nav-item" onclick="doLogout()">↩ <span class="label">登出</span></button>
     </div>
   </div>
@@ -504,6 +505,30 @@
 
       <!-- ---- 設定 ---- -->
       <div class="panel" id="panel-settings">
+        <!-- 管理員建立使用者功能（僅管理員看得到） -->
+        <div class="card" id="adminUserCard" style="display:none;">
+          <h2>👥 新增使用者帳號（管理員專用）</h2>
+          <div class="hint" style="margin-bottom:12px;">直接為公司內部成員開立帳號與初始密碼，建立後成員即可登入。</div>
+          <div class="grid3">
+            <div class="field">
+              <label>成員 Email *</label>
+              <input type="email" id="new_user_email" placeholder="user@usis.com.tw">
+            </div>
+            <div class="field">
+              <label>初始密碼 *（至少 6 碼）</label>
+              <input type="password" id="new_user_password" placeholder="請設定登入密碼">
+            </div>
+            <div class="field">
+              <label>系統身分</label>
+              <select id="new_user_role">
+                <option value="staff">一般人員</option>
+                <option value="admin">管理員</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="createUserBtn" onclick="createAccountByAdmin()">建立使用者</button>
+        </div>
+
         <div class="card">
           <h2>公司資訊（列印於報價單上）</h2>
           <div id="settingsAdminHint" class="hint" style="margin-bottom:12px;"></div>
@@ -576,6 +601,27 @@
     <div class="modal-foot">
       <button class="btn btn-line btn-sm" onclick="closeCatalogEditor()">取消</button>
       <button class="btn btn-primary btn-sm" id="editCatalogSaveBtn" onclick="saveCatalogEdit()">儲存變更</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 個人修改密碼 modal ============ -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal">
+    <div class="modal-head"><h3>修改個人登入密碼</h3><button class="btn btn-ghost btn-sm" onclick="closePasswordModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>新密碼（至少 6 碼）</label>
+        <input type="password" id="user_new_password" placeholder="請輸入新密碼">
+      </div>
+      <div class="field">
+        <label>再次輸入新密碼</label>
+        <input type="password" id="user_confirm_password" placeholder="請確認新密碼">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closePasswordModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="savePasswordBtn" onclick="updateOwnPassword()">確認變更</button>
     </div>
   </div>
 </div>
@@ -796,11 +842,107 @@ function applySettingsPermissions(){
   const saveBtn = document.getElementById('settingsSaveBtn');
   if(saveBtn) saveBtn.style.display = isAdmin ? 'inline-flex' : 'none';
   
+  const adminUserCard = document.getElementById('adminUserCard');
+  if(adminUserCard) adminUserCard.style.display = isAdmin ? 'block' : 'none';
+
   const hintEl = document.getElementById('settingsAdminHint');
   if(hintEl){
     hintEl.textContent = isAdmin
       ? '你是管理員，可編輯並儲存公司基本資料。'
       : '公司資訊僅管理員可修改，如需更新請聯絡管理員。';
+  }
+}
+
+/* ================= 管理員建立帳號 ================= */
+async function createAccountByAdmin(){
+  const email = document.getElementById('new_user_email').value.trim();
+  const password = document.getElementById('new_user_password').value;
+  const role = document.getElementById('new_user_role').value;
+  const btn = document.getElementById('createUserBtn');
+
+  if(!email || !password){
+    toast('請填寫 Email 與密碼', true);
+    return;
+  }
+  if(password.length < 6){
+    toast('密碼長度至少需要 6 個字元', true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '建立中...';
+
+  try{
+    // 利用第二組 client 建立帳號，避免目前的管理員 session 被覆蓋
+    const url = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
+    const key = localStorage.getItem('usis_sb_key') || DEFAULT_SB_KEY;
+    const tempSb = window.supabase.createClient(url, key, { auth: { persistSession: false } });
+
+    const { data: authData, error: authErr } = await tempSb.auth.signUp({
+      email,
+      password,
+      options: { data: { role } }
+    });
+
+    if(authErr) throw authErr;
+
+    // 若 profiles 表存在且有權限，同步寫入角色
+    if(authData.user){
+      await sb.from('profiles').upsert({
+        id: authData.user.id,
+        email,
+        display_name: email,
+        role
+      });
+    }
+
+    toast('帳號建立成功！成員現在可以直接登入');
+    document.getElementById('new_user_email').value = '';
+    document.getElementById('new_user_password').value = '';
+  }catch(e){
+    toast('建立帳號失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '建立使用者';
+  }
+}
+
+/* ================= 使用者修改個人密碼 ================= */
+function openPasswordModal(){
+  document.getElementById('user_new_password').value = '';
+  document.getElementById('user_confirm_password').value = '';
+  document.getElementById('passwordModal').classList.add('active');
+}
+function closePasswordModal(){
+  document.getElementById('passwordModal').classList.remove('active');
+}
+async function updateOwnPassword(){
+  const pwd = document.getElementById('user_new_password').value;
+  const confirmPwd = document.getElementById('user_confirm_password').value;
+  const btn = document.getElementById('savePasswordBtn');
+
+  if(!pwd || pwd.length < 6){
+    toast('密碼至少需要 6 個字元', true);
+    return;
+  }
+  if(pwd !== confirmPwd){
+    toast('兩次輸入的密碼不一致', true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '更新中...';
+
+  try{
+    const { error } = await sb.auth.updateUser({ password: pwd });
+    if(error) throw error;
+    toast('密碼已成功更新！');
+    closePasswordModal();
+  }catch(e){
+    toast('修改密碼失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '確認變更';
   }
 }
 
@@ -924,7 +1066,6 @@ async function addCatalogItem(){
   }
 }
 
-/* 開啟與儲存編輯服務項目 */
 function openCatalogEditor(id){
   const item = catalog.find(x => String(x.id) === String(id));
   if(!item){
