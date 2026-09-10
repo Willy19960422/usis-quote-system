@@ -505,7 +505,7 @@
 
       <!-- ---- 設定 ---- -->
       <div class="panel" id="panel-settings">
-        <!-- 管理員建立使用者功能（僅管理員看得到） -->
+        <!-- 管理員建立使用者功能（僅管理員顯示） -->
         <div class="card" id="adminUserCard" style="display:none;">
           <h2>👥 新增使用者帳號（管理員專用）</h2>
           <div class="hint" style="margin-bottom:12px;">直接為公司內部成員開立帳號與初始密碼，建立後成員即可登入。</div>
@@ -795,6 +795,20 @@ async function doLogout(){
   document.getElementById('loginPassword').value='';
 }
 
+/* 身分 UI 渲染鎖定 */
+function updateRoleUI(){
+  const isAdmin = currentProfile && currentProfile.role === 'admin';
+  const roleEl = document.getElementById('userRole');
+  if(roleEl){
+    roleEl.textContent = isAdmin ? '管理員' : '一般人員';
+    roleEl.className = 'role' + (isAdmin ? ' admin' : '');
+  }
+  const userEmailEl = document.getElementById('userEmail');
+  if(userEmailEl && currentUser){
+    userEmailEl.textContent = currentUser.email;
+  }
+}
+
 async function afterLogin(){
   try{
     let role = 'staff';
@@ -809,30 +823,28 @@ async function afterLogin(){
     }
 
     currentProfile = { role, email: currentUser.email };
-    const isAdmin = (role === 'admin');
-
-    document.getElementById('userEmail').textContent = currentUser.email;
-    const roleEl = document.getElementById('userRole');
-    roleEl.textContent = isAdmin ? '管理員' : '一般人員';
-    roleEl.className = 'role' + (isAdmin ? ' admin' : '');
 
     document.getElementById('conn_url').value = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
 
+    updateRoleUI();
+    applySettingsPermissions();
+
     await loadCompanySettings();
     await loadCatalog();
     await loadQuotations();
     resetEditor();
-    applySettingsPermissions();
   }catch(e){
     console.error('Fatal load error:', e);
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
+    updateRoleUI();
   }
 }
 
 function applySettingsPermissions(){
+  updateRoleUI();
   const isAdmin = currentProfile && currentProfile.role === 'admin';
   const ids = ['s_company_name','s_tax_id','s_address','s_phone','s_prefix','s_bank'];
   ids.forEach(id => {
@@ -873,7 +885,6 @@ async function createAccountByAdmin(){
   btn.textContent = '建立中...';
 
   try{
-    // 利用第二組 client 建立帳號，避免目前的管理員 session 被覆蓋
     const url = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
     const key = localStorage.getItem('usis_sb_key') || DEFAULT_SB_KEY;
     const tempSb = window.supabase.createClient(url, key, { auth: { persistSession: false } });
@@ -886,7 +897,6 @@ async function createAccountByAdmin(){
 
     if(authErr) throw authErr;
 
-    // 若 profiles 表存在且有權限，同步寫入角色
     if(authData.user){
       await sb.from('profiles').upsert({
         id: authData.user.id,
@@ -965,6 +975,7 @@ function switchPanel(id){
     document.getElementById('pageTitle').textContent = titles[id][0];
     document.getElementById('pageDesc').textContent = titles[id][1];
   }
+  updateRoleUI();
   if(id === 'panel-list') renderList();
   if(id === 'panel-catalog') renderCatalog();
 }
@@ -1172,7 +1183,7 @@ function resetEditor(){
   recalcTotals();
   setLocked(false);
   document.getElementById('deleteBtn').style.display = 'none';
-  switchPanel('panel-editor');
+  updateRoleUI();
 }
 
 function renderItems(){
