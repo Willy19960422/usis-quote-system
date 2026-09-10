@@ -117,7 +117,7 @@
   .panel{display:none;max-width:1200px;margin:0 auto;}
   .panel.active{display:block;}
 
-  /* 設定專屬子項目 Tabs 排版 */
+  /* 子分頁導覽列 */
   .settings-tabs{
     display:flex;
     gap:8px;
@@ -252,8 +252,6 @@
   .toast.show{opacity:1;transform:translateY(0);}
   .toast.err{background:var(--rejected);}
 
-  /* ---------- print / PDF layout ---------- */
-  #printArea{display:none;}
   @media print{
     html, body{overflow:visible !important;height:auto !important;}
     body *{visibility:hidden;}
@@ -290,7 +288,7 @@
 </head>
 <body>
 
-<!-- ============ 1) 連線設定 ============ -->
+<!-- 1) 連線設定 -->
 <div id="setupScreen" class="center-screen" style="display:none;">
   <div class="auth-card">
     <div class="auth-brand">
@@ -314,7 +312,7 @@
   </div>
 </div>
 
-<!-- ============ 2) 登入畫面 ============ -->
+<!-- 2) 登入畫面 -->
 <div id="loginScreen" class="center-screen" style="display:none;">
   <div class="auth-card">
     <div class="auth-brand">
@@ -338,7 +336,7 @@
   </div>
 </div>
 
-<!-- ============ 3) 主系統 ============ -->
+<!-- 3) 主系統 -->
 <div id="app">
 <div class="shell">
   <div class="sidebar">
@@ -375,7 +373,7 @@
 
     <div class="content">
 
-      <!-- ---- 1. 新增／編輯報價單 ---- -->
+      <!-- 1. 新增／編輯報價單 -->
       <div class="panel active" id="panel-editor">
         <div id="lockedBanner" class="locked-banner" style="display:none;">
           <span>🔒 此報價單狀態為「已接受」，已鎖定無法編輯。如需修改請先解鎖。</span>
@@ -468,7 +466,7 @@
         </div>
       </div>
 
-      <!-- ---- 2. 報價單列表 ---- -->
+      <!-- 2. 報價單列表 -->
       <div class="panel" id="panel-list">
         <div class="toolbar">
           <input type="text" id="searchInput" placeholder="搜尋客戶名稱或編號..." oninput="renderList()">
@@ -494,7 +492,7 @@
         </div>
       </div>
 
-      <!-- ---- 3. 客戶資料管理 ---- -->
+      <!-- 3. 客戶資料管理 -->
       <div class="panel" id="panel-clients">
         <div class="card">
           <h2>新增客戶資料（全員皆可建立）</h2>
@@ -531,7 +529,7 @@
         </div>
       </div>
 
-      <!-- ---- 4. 服務項目管理 ---- -->
+      <!-- 4. 服務項目管理 -->
       <div class="panel" id="panel-catalog">
         <div class="card">
           <h2>新增服務項目</h2>
@@ -573,9 +571,9 @@
         </div>
       </div>
 
-      <!-- ---- 5. 設定（含子項目分頁 Tabs） ---- -->
+      <!-- 5. 設定（子項目 Tabs 架構） -->
       <div class="panel" id="panel-settings">
-        <!-- 頂部子項目標籤切換列 -->
+        <!-- 頂部 Tabs 列 -->
         <div class="settings-tabs">
           <button class="tab-btn active" onclick="switchSettingsTab('tab-profile')">👤 個人業務資料</button>
           <button class="tab-btn" onclick="switchSettingsTab('tab-company')">🏢 公司資訊</button>
@@ -592,7 +590,7 @@
               <div class="field"><label>業務姓名／顯示名稱</label><input type="text" id="my_display_name" placeholder="例如：郭楚葳 Willy"></div>
               <div class="field"><label>業務電話 / 手機</label><input type="text" id="my_phone" placeholder="例如：0912-345-678"></div>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="savePersonalProfile()">儲存個人資料</button>
+            <button class="btn btn-primary btn-sm" id="saveProfileBtn" onclick="savePersonalProfile()">儲存個人資料</button>
           </div>
         </div>
 
@@ -613,7 +611,7 @@
           </div>
         </div>
 
-        <!-- 子項目 3：成員帳號管理（僅管理員顯示） -->
+        <!-- 子項目 3：成員帳號管理（獨立子分頁） -->
         <div class="settings-subpanel" id="tab-users">
           <div class="card">
             <h2>新增成員帳號</h2>
@@ -669,7 +667,7 @@
 </div>
 </div>
 
-<!-- ============ 客戶挑選 modal ============ -->
+<!-- 客戶挑選 modal -->
 <div class="modal-overlay" id="clientModal">
   <div class="modal">
     <div class="modal-head">
@@ -686,7 +684,7 @@
   </div>
 </div>
 
-<!-- ============ 客戶編輯 modal（管理員專用） ============ -->
+<!-- 客戶編輯 modal（管理員） -->
 <div class="modal-overlay" id="clientEditModal">
   <div class="modal">
     <div class="modal-head">
@@ -731,7 +729,7 @@
   </div>
 </div>
 
-<!-- ============ 服務目錄選擇 modal ============ -->
+<!-- 服務目錄挑選 modal -->
 <div class="modal-overlay" id="catalogModal">
   <div class="modal">
     <div class="modal-head"><h3>從服務目錄選擇項目</h3><button class="btn btn-ghost btn-sm" onclick="closeCatalogPicker()">✕</button></div>
@@ -740,7 +738,7 @@
   </div>
 </div>
 
-<!-- ============ 服務目錄編輯 modal ============ -->
+<!-- 服務目錄編輯 modal -->
 <div class="modal-overlay" id="catalogEditModal">
   <div class="modal">
     <div class="modal-head"><h3>編輯服務項目</h3><button class="btn btn-ghost btn-sm" onclick="closeCatalogEditor()">✕</button></div>
@@ -782,7 +780,7 @@
   </div>
 </div>
 
-<!-- ============ 個人修改密碼 modal ============ -->
+<!-- 個人修改密碼 modal -->
 <div class="modal-overlay" id="passwordModal">
   <div class="modal">
     <div class="modal-head"><h3>修改個人登入密碼</h3><button class="btn btn-ghost btn-sm" onclick="closePasswordModal()">✕</button></div>
@@ -803,7 +801,7 @@
   </div>
 </div>
 
-<!-- ============ 列印用內容 ============ -->
+<!-- 列印用內容 -->
 <div id="printArea">
   <div class="p-head">
     <div class="p-logo-wrap">
@@ -974,7 +972,6 @@ async function doLogout(){
   document.getElementById('loginPassword').value='';
 }
 
-/* 身分 UI 渲染鎖定 */
 function updateRoleUI(){
   const isAdmin = currentProfile && currentProfile.role === 'admin';
   const roleEl = document.getElementById('userRole');
@@ -988,7 +985,6 @@ function updateRoleUI(){
     userEmailEl.textContent = displayName;
     userEmailEl.title = currentUser.email;
   }
-  // 控制設定內部「成員帳號管理」子項目標籤是否顯示
   const tabUsersBtn = document.getElementById('tab-btn-users');
   if(tabUsersBtn){
     tabUsersBtn.style.display = isAdmin ? 'inline-block' : 'none';
@@ -1062,27 +1058,43 @@ function applySettingsPermissions(){
   }
 }
 
-/* ================= 個人業務資料設定 ================= */
+/* ================= 個人業務資料設定（真實寫入 Supabase 資料庫） ================= */
 async function savePersonalProfile(){
   const displayName = document.getElementById('my_display_name').value.trim();
   const phone = document.getElementById('my_phone').value.trim();
+  const btn = document.getElementById('saveProfileBtn');
 
-  currentProfile.display_name = displayName;
-  currentProfile.phone = phone;
-  localStorage.setItem('usis_my_name', displayName);
-  localStorage.setItem('usis_my_phone', phone);
+  btn.disabled = true;
+  btn.textContent = '儲存中...';
 
   try{
-    await sb.from('profiles').update({
+    const { error } = await sb.from('profiles').update({
       display_name: displayName,
       phone: phone
     }).eq('id', currentUser.id);
-  }catch(e){
-    console.warn('profiles update warning:', e);
-  }
 
-  updateRoleUI();
-  toast('個人業務資料已更新！');
+    if(error) throw error;
+
+    currentProfile.display_name = displayName;
+    currentProfile.phone = phone;
+    localStorage.setItem('usis_my_name', displayName);
+    localStorage.setItem('usis_my_phone', phone);
+
+    updateRoleUI();
+
+    const salesRepInput = document.getElementById('f_sales_rep');
+    if(salesRepInput && (!salesRepInput.value || salesRepInput.value === currentUser.email)){
+      salesRepInput.value = displayName;
+    }
+
+    toast('個人業務資料已成功儲存至資料庫！');
+  }catch(e){
+    console.error('儲存個人資料失敗:', e);
+    toast('儲存失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '儲存個人資料';
+  }
 }
 
 /* ================= 客戶資料庫管理 ================= */
@@ -1437,7 +1449,6 @@ function switchPanel(id){
   if(id === 'panel-clients') renderClientsList();
   if(id === 'panel-catalog') renderCatalog();
   if(id === 'panel-settings') {
-    // 進入設定頁時預設開啟個人業務資料 Tab
     switchSettingsTab('tab-profile');
   }
 }
