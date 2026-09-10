@@ -572,12 +572,12 @@
 
       <!-- 5. 設定（子項目 Tabs 架構） -->
       <div class="panel" id="panel-settings">
-        <!-- 頂部 Tabs 列 -->
+        <!-- 頂部 Tabs 列（連線設定與成員帳號已綁定權限控制） -->
         <div class="settings-tabs">
           <button class="tab-btn active" onclick="switchSettingsTab('tab-profile')">👤 個人業務資料</button>
           <button class="tab-btn" onclick="switchSettingsTab('tab-company')">🏢 公司資訊</button>
           <button class="tab-btn" id="tab-btn-users" onclick="switchSettingsTab('tab-users')" style="display:none;">👥 成員帳號管理</button>
-          <button class="tab-btn" onclick="switchSettingsTab('tab-conn')">🔌 連線設定</button>
+          <button class="tab-btn" id="tab-btn-conn" onclick="switchSettingsTab('tab-conn')" style="display:none;">🔌 連線設定</button>
         </div>
 
         <!-- 子項目 1：個人業務資料 -->
@@ -610,7 +610,7 @@
           </div>
         </div>
 
-        <!-- 子項目 3：成員帳號管理（獨立子分頁） -->
+        <!-- 子項目 3：成員帳號管理（僅管理員能看到與操作） -->
         <div class="settings-subpanel" id="tab-users">
           <div class="card">
             <h2>新增成員帳號</h2>
@@ -650,7 +650,7 @@
           </div>
         </div>
 
-        <!-- 子項目 4：連線設定 -->
+        <!-- 子項目 4：連線設定（僅管理員能看到與操作） -->
         <div class="settings-subpanel" id="tab-conn">
           <div class="card">
             <h2>連線設定</h2>
@@ -984,9 +984,14 @@ function updateRoleUI(){
     userEmailEl.textContent = displayName;
     userEmailEl.title = currentUser.email;
   }
+  // 控制設定內部子項目權限：管理員專屬的「成員帳號管理」與「連線設定」
   const tabUsersBtn = document.getElementById('tab-btn-users');
   if(tabUsersBtn){
     tabUsersBtn.style.display = isAdmin ? 'inline-block' : 'none';
+  }
+  const tabConnBtn = document.getElementById('tab-btn-conn');
+  if(tabConnBtn){
+    tabConnBtn.style.display = isAdmin ? 'inline-block' : 'none';
   }
 }
 
@@ -1007,11 +1012,12 @@ async function afterLogin(){
       console.warn('Profiles query fallback used:', err);
     }
 
+    // 嚴格讀取資料庫該使用者的值，若為空則呈現空白，杜絕共用 localStorage 快取污染
     currentProfile = { 
       role, 
       email: currentUser.email,
-      display_name: profileData?.display_name || localStorage.getItem('usis_my_name') || '',
-      phone: profileData?.phone || localStorage.getItem('usis_my_phone') || ''
+      display_name: profileData?.display_name || '',
+      phone: profileData?.phone || ''
     };
 
     document.getElementById('my_display_name').value = currentProfile.display_name;
@@ -1076,13 +1082,15 @@ async function savePersonalProfile(){
 
     currentProfile.display_name = displayName;
     currentProfile.phone = phone;
-    localStorage.setItem('usis_my_name', displayName);
-    localStorage.setItem('usis_my_phone', phone);
+
+    // 清除舊快取
+    localStorage.removeItem('usis_my_name');
+    localStorage.removeItem('usis_my_phone');
 
     updateRoleUI();
 
     const salesRepInput = document.getElementById('f_sales_rep');
-    if(salesRepInput && (!salesRepInput.value || salesRepInput.value === currentUser.email)){
+    if(salesRepInput){
       salesRepInput.value = displayName;
     }
 
