@@ -104,6 +104,7 @@
     padding:2px 8px;border-radius:10px;margin-top:4px;color:#e3f0f1;font-weight:600;
   }
   .user-chip .role.admin{background:var(--brand);color:#fff;}
+  .user-chip .role.manager{background:var(--sent);color:#fff;}
 
   .main{flex:1;height:100vh;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
   .topbar{
@@ -528,9 +529,9 @@
         </div>
       </div>
 
-      <!-- 4. 服務項目管理 -->
+      <!-- 4. 服務項目管理（管理員與業務經理專屬編輯） -->
       <div class="panel" id="panel-catalog">
-        <div class="card">
+        <div class="card" id="adminCatalogCard" style="display:none;">
           <h2>新增服務項目</h2>
           <div class="grid3">
             <div class="field">
@@ -561,7 +562,7 @@
                 <th>說明</th>
                 <th style="width:70px;">單位</th>
                 <th style="width:120px;text-align:right;">參考單價</th>
-                <th style="width:120px;text-align:center;">動作</th>
+                <th id="th_catalog_action" style="width:120px;text-align:center;display:none;">動作</th>
               </tr>
             </thead>
             <tbody id="catalogBody"></tbody>
@@ -572,7 +573,6 @@
 
       <!-- 5. 設定（子項目 Tabs 架構） -->
       <div class="panel" id="panel-settings">
-        <!-- 頂部 Tabs 列（連線設定與成員帳號已綁定權限控制） -->
         <div class="settings-tabs">
           <button class="tab-btn active" onclick="switchSettingsTab('tab-profile')">👤 個人業務資料</button>
           <button class="tab-btn" onclick="switchSettingsTab('tab-company')">🏢 公司資訊</button>
@@ -610,7 +610,7 @@
           </div>
         </div>
 
-        <!-- 子項目 3：成員帳號管理（僅管理員能看到與操作） -->
+        <!-- 子項目 3：成員帳號管理（僅管理員顯示） -->
         <div class="settings-subpanel" id="tab-users">
           <div class="card">
             <h2>新增成員帳號</h2>
@@ -627,8 +627,9 @@
               <div class="field">
                 <label>系統身分</label>
                 <select id="new_user_role">
-                  <option value="staff">一般人員</option>
-                  <option value="admin">管理員</option>
+                  <option value="staff">業務人員</option>
+                  <option value="manager">業務經理</option>
+                  <option value="admin">系統管理員</option>
                 </select>
               </div>
             </div>
@@ -650,7 +651,7 @@
           </div>
         </div>
 
-        <!-- 子項目 4：連線設定（僅管理員能看到與操作） -->
+        <!-- 子項目 4：連線設定（僅管理員顯示） -->
         <div class="settings-subpanel" id="tab-conn">
           <div class="card">
             <h2>連線設定</h2>
@@ -683,7 +684,7 @@
   </div>
 </div>
 
-<!-- 客戶編輯 modal（管理員） -->
+<!-- 客戶編輯 modal（管理員 / 業務經理） -->
 <div class="modal-overlay" id="clientEditModal">
   <div class="modal">
     <div class="modal-head">
@@ -737,7 +738,7 @@
   </div>
 </div>
 
-<!-- 服務目錄編輯 modal -->
+<!-- 服務目錄編輯 modal（管理員 / 業務經理） -->
 <div class="modal-overlay" id="catalogEditModal">
   <div class="modal">
     <div class="modal-head"><h3>編輯服務項目</h3><button class="btn btn-ghost btn-sm" onclick="closeCatalogEditor()">✕</button></div>
@@ -869,6 +870,7 @@ let currentQuote = null;
 let itemSeq = 0;
 
 const STATUS_LABEL = { draft:'草稿', sent:'已送出', accepted:'已接受', rejected:'已拒絕', expired:'已過期' };
+const ROLE_LABEL = { admin:'系統管理員', manager:'業務經理', staff:'業務人員' };
 
 function toast(msg, isErr){
   const t = document.getElementById('toast');
@@ -971,12 +973,17 @@ async function doLogout(){
   document.getElementById('loginPassword').value='';
 }
 
+/* 權限核心渲染控制 */
 function updateRoleUI(){
-  const isAdmin = currentProfile && currentProfile.role === 'admin';
+  const role = currentProfile?.role || 'staff';
+  const isAdmin = (role === 'admin');
+  const isManager = (role === 'manager');
+  const canManageContent = isAdmin || isManager;
+
   const roleEl = document.getElementById('userRole');
   if(roleEl){
-    roleEl.textContent = isAdmin ? '管理員' : '一般人員';
-    roleEl.className = 'role' + (isAdmin ? ' admin' : '');
+    roleEl.textContent = ROLE_LABEL[role] || '業務人員';
+    roleEl.className = 'role ' + role;
   }
   const userEmailEl = document.getElementById('userEmail');
   if(userEmailEl && currentUser){
@@ -984,15 +991,18 @@ function updateRoleUI(){
     userEmailEl.textContent = displayName;
     userEmailEl.title = currentUser.email;
   }
-  // 控制設定內部子項目權限：管理員專屬的「成員帳號管理」與「連線設定」
+
+  // 1. 設定內的「成員帳號管理」與「連線設定」僅 admin 可看
   const tabUsersBtn = document.getElementById('tab-btn-users');
-  if(tabUsersBtn){
-    tabUsersBtn.style.display = isAdmin ? 'inline-block' : 'none';
-  }
+  if(tabUsersBtn) tabUsersBtn.style.display = isAdmin ? 'inline-block' : 'none';
   const tabConnBtn = document.getElementById('tab-btn-conn');
-  if(tabConnBtn){
-    tabConnBtn.style.display = isAdmin ? 'inline-block' : 'none';
-  }
+  if(tabConnBtn) tabConnBtn.style.display = isAdmin ? 'inline-block' : 'none';
+
+  // 2. 服務項目管理：admin 或 manager 可新增、編輯、刪除；staff 唯讀
+  const adminCatalogCard = document.getElementById('adminCatalogCard');
+  if(adminCatalogCard) adminCatalogCard.style.display = canManageContent ? 'block' : 'none';
+  const thCatalogAction = document.getElementById('th_catalog_action');
+  if(thCatalogAction) thCatalogAction.style.display = canManageContent ? 'table-cell' : 'none';
 }
 
 async function afterLogin(){
@@ -1012,7 +1022,6 @@ async function afterLogin(){
       console.warn('Profiles query fallback used:', err);
     }
 
-    // 嚴格讀取資料庫該使用者的值，若為空則呈現空白，杜絕共用 localStorage 快取污染
     currentProfile = { 
       role, 
       email: currentUser.email,
@@ -1058,8 +1067,8 @@ function applySettingsPermissions(){
   const hintEl = document.getElementById('settingsAdminHint');
   if(hintEl){
     hintEl.textContent = isAdmin
-      ? '你是管理員，可編輯並儲存公司基本資料。'
-      : '公司資訊僅管理員可修改，如需更新請聯絡管理員。';
+      ? '你是系統管理員，可編輯並儲存公司基本資料。'
+      : '公司資訊僅系統管理員可修改，如需更新請聯絡管理員。';
   }
 }
 
@@ -1083,7 +1092,6 @@ async function savePersonalProfile(){
     currentProfile.display_name = displayName;
     currentProfile.phone = phone;
 
-    // 清除舊快取
     localStorage.removeItem('usis_my_name');
     localStorage.removeItem('usis_my_phone');
 
@@ -1122,7 +1130,9 @@ function renderClientsList(){
   const body = document.getElementById('clientsBody');
   const empty = document.getElementById('clientsEmpty');
   const q = (document.getElementById('cli_search')?.value || '').toLowerCase();
-  const isAdmin = currentProfile && currentProfile.role === 'admin';
+  
+  // 業務經理與管理員擁有編輯/刪除客戶權限；業務人員僅能新增與帶入
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
   
   const filtered = clients.filter(c => 
     !q || 
@@ -1144,7 +1154,7 @@ function renderClientsList(){
       <td>${escapeHtml(c.email || '-')}</td>
       <td style="text-align:center;">
         <button class="btn btn-ghost btn-sm" onclick="applyClientToEditor('${c.id}')">帶入</button>
-        ${isAdmin ? `
+        ${canEditClients ? `
           <button class="btn btn-ghost btn-sm" onclick="openClientEditor('${c.id}')">編輯</button>
           <button class="btn btn-ghost btn-sm" onclick="deleteClientItem('${c.id}')" style="color:var(--danger);">刪除</button>
         ` : ''}
@@ -1185,6 +1195,11 @@ async function addNewClient(){
 }
 
 function openClientEditor(id){
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canEditClients){
+    toast('權限不足：業務人員不可編輯客戶資料', true);
+    return;
+  }
   const c = clients.find(x => x.id === id);
   if(!c) return;
   document.getElementById('edit_cli_id').value = c.id;
@@ -1202,6 +1217,11 @@ function closeClientEditor(){
 }
 
 async function saveClientEdit(){
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canEditClients){
+    toast('權限不足：業務人員不可修改客戶資料', true);
+    return;
+  }
   const id = document.getElementById('edit_cli_id').value;
   const company_name = document.getElementById('edit_cli_name').value.trim();
   if(!company_name){
@@ -1234,6 +1254,11 @@ async function saveClientEdit(){
 }
 
 async function deleteClientItem(id){
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canEditClients){
+    toast('權限不足：業務人員不可刪除客戶資料', true);
+    return;
+  }
   if(!confirm('確定要刪除這筆客戶資料嗎？此動作無法復原。')) return;
   try{
     const { error } = await sb.from('clients').delete().eq('id', id);
@@ -1307,7 +1332,7 @@ function applyClientToEditor(id){
   toast('已將客戶資料帶入報價單');
 }
 
-/* ================= 成員帳號管理 ================= */
+/* ================= 成員帳號管理（管理員） ================= */
 async function loadTeamProfiles(){
   try{
     const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending:false });
@@ -1334,7 +1359,7 @@ function renderTeamProfiles(){
       <td><b>${escapeHtml(u.email || '-')}</b></td>
       <td>${escapeHtml(u.display_name || '-')}</td>
       <td>${escapeHtml(u.phone || '-')}</td>
-      <td><span class="badge ${u.role === 'admin' ? 'accepted' : 'draft'}">${u.role === 'admin' ? '管理員' : '一般人員'}</span></td>
+      <td><span class="badge ${u.role === 'admin' ? 'accepted' : (u.role === 'manager' ? 'sent' : 'draft')}">${ROLE_LABEL[u.role] || '業務人員'}</span></td>
     `;
     body.appendChild(tr);
   });
@@ -1374,15 +1399,12 @@ async function createAccountByAdmin(){
     if(authErr) throw authErr;
 
     if(authData.user){
-      const { error: profErr } = await sb.from('profiles').upsert({
+      await sb.from('profiles').upsert({
         id: authData.user.id,
         email: email,
         display_name: email.split('@')[0],
         role: role
       });
-      if(profErr) {
-        console.warn('寫入 profiles 警告:', profErr);
-      }
     }
 
     toast('帳號建立成功！已加入成員列表');
@@ -1465,7 +1487,6 @@ function switchPanel(id){
   }
 }
 
-/* 設定子項目 Tabs 切換 */
 function switchSettingsTab(subTabId){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.settings-subpanel').forEach(p => p.classList.remove('active'));
@@ -1499,6 +1520,11 @@ async function loadCompanySettings(){
 }
 
 async function saveCompanySettings(){
+  const isAdmin = currentProfile && currentProfile.role === 'admin';
+  if(!isAdmin){
+    toast('權限不足：僅系統管理員可儲存公司資訊', true);
+    return;
+  }
   const payload = {
     id:1,
     company_name: document.getElementById('s_company_name').value.trim(),
@@ -1518,7 +1544,7 @@ async function saveCompanySettings(){
   }
 }
 
-/* ================= 服務目錄 ================= */
+/* ================= 服務目錄（管理員 / 業務經理） ================= */
 async function loadCatalog(){
   try{
     const { data, error } = await sb.from('service_catalog').select('*').order('sort_order');
@@ -1536,8 +1562,13 @@ async function loadCatalog(){
 
 function renderCatalog(){
   const body = document.getElementById('catalogBody');
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
   body.innerHTML = '';
   document.getElementById('catalogEmpty').style.display = catalog.length ? 'none' : 'block';
+  
+  const thAction = document.getElementById('th_catalog_action');
+  if(thAction) thAction.style.display = canManageCatalog ? 'table-cell' : 'none';
+
   catalog.forEach(item=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1546,15 +1577,21 @@ function renderCatalog(){
       <td>${escapeHtml(item.description||'')}</td>
       <td>${escapeHtml(item.unit||'式')}</td>
       <td class="num" style="text-align:right;">${money(item.default_price)}</td>
-      <td style="text-align:center;">
-        <button class="btn btn-ghost btn-sm" onclick="openCatalogEditor('${item.id}')">編輯</button>
-        ${item.id ? `<button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')" style="color:var(--danger);">刪除</button>` : ''}
-      </td>`;
+      ${canManageCatalog ? `
+        <td style="text-align:center;">
+          <button class="btn btn-ghost btn-sm" onclick="openCatalogEditor('${item.id}')">編輯</button>
+          ${item.id ? `<button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')" style="color:var(--danger);">刪除</button>` : ''}
+        </td>` : ''}`;
     body.appendChild(tr);
   });
 }
 
 async function addCatalogItem(){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法新增服務項目', true);
+    return;
+  }
   const item_name = document.getElementById('c_name').value.trim();
   if(!item_name){ toast('請輸入項目名稱', true); return; }
   const payload = {
@@ -1579,6 +1616,11 @@ async function addCatalogItem(){
 }
 
 function openCatalogEditor(id){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法編輯服務項目', true);
+    return;
+  }
   const item = catalog.find(x => String(x.id) === String(id));
   if(!item){
     toast('找不到該項目', true);
@@ -1599,6 +1641,11 @@ function closeCatalogEditor(){
 }
 
 async function saveCatalogEdit(){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法編輯服務項目', true);
+    return;
+  }
   const id = document.getElementById('edit_c_id').value;
   const item_name = document.getElementById('edit_c_name').value.trim();
   if(!item_name){
@@ -1637,6 +1684,11 @@ async function saveCatalogEdit(){
 }
 
 async function deleteCatalogItem(id){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法刪除服務項目', true);
+    return;
+  }
   if(!confirm('確定要刪除這個服務項目嗎？')) return;
   try{
     const { error } = await sb.from('service_catalog').delete().eq('id', id);
@@ -1648,7 +1700,7 @@ async function deleteCatalogItem(id){
   }
 }
 
-/* ================= 服務目錄選擇核心修復 ================= */
+/* ================= 服務目錄挑選核心 ================= */
 function openCatalogPicker(){
   const modal = document.getElementById('catalogModal');
   const list = document.getElementById('catalogPickerList');
@@ -1691,7 +1743,6 @@ function closeCatalogPicker(){
   document.getElementById('catalogModal').classList.remove('active');
 }
 
-/* 智慧新增項目列：若第一列是空白則直接覆蓋，否則追加至末尾 */
 function addItemRow(prefill){
   const newRow = blankItemRow(prefill);
   if (editorItems.length === 1 && !editorItems[0].item_name.trim()) {
@@ -1806,7 +1857,7 @@ function setLocked(locked){
   document.getElementById('saveBtn').disabled = locked;
 }
 
-/* ================= 儲存 / 讀取 / 刪除 報價單 ================= */
+/* ================= 儲存 / 讀取 / 刪除 報價單（綁定擁有者驗證） ================= */
 function collectFormData(){
   const { subtotal, tax, total, taxRate } = recalcTotals();
   return {
@@ -1823,6 +1874,7 @@ function collectFormData(){
     tax_rate: taxRate,
     subtotal, tax_amount: tax, total,
     status: document.getElementById('f_status').value,
+    user_id: currentUser.id
   };
 }
 
@@ -1830,6 +1882,15 @@ async function saveQuotation(){
   const data = collectFormData();
   if(!data.client_name){ toast('請輸入客戶公司名稱', true); return; }
   if(editorItems.every(r=>!r.item_name.trim())){ toast('請至少輸入一項服務項目', true); return; }
+
+  // 業務人員權限判定：若已是既有單且不是自己開的，禁止修改
+  if(currentQuote && currentQuote.user_id && currentQuote.user_id !== currentUser.id){
+    const canManageAll = ['admin', 'manager'].includes(currentProfile.role);
+    if(!canManageAll){
+      toast('權限不足：業務人員只能編輯自己開立的報價單', true);
+      return;
+    }
+  }
 
   const willLock = data.status === 'accepted';
   data.locked = willLock;
@@ -1921,7 +1982,12 @@ function renderList(){
   const body = document.getElementById('listBody');
   body.innerHTML = '';
   document.getElementById('listEmpty').style.display = filtered.length ? 'none' : 'block';
+
   filtered.forEach(row=>{
+    // 判斷該筆報價單是否可由當前登入者編輯（管理員/經理可改全部，業務人員只能改自己開的單）
+    const isOwner = row.user_id === currentUser.id;
+    const canEditThisQuote = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="num">${escapeHtml(row.quote_no)}</td>
@@ -1930,7 +1996,7 @@ function renderList(){
       <td class="num">${money(row.total)}</td>
       <td><span class="badge ${row.status}">${STATUS_LABEL[row.status]||row.status}</span></td>
       <td>
-        <button class="btn btn-ghost btn-sm" onclick="openQuotation('${row.id}')">檢視</button>
+        <button class="btn btn-ghost btn-sm" onclick="openQuotation('${row.id}')">${canEditThisQuote ? '檢視／編輯' : '檢視'}</button>
         <button class="btn btn-ghost btn-sm" onclick="duplicateQuotation('${row.id}')">複製</button>
       </td>`;
     body.appendChild(tr);
@@ -1948,7 +2014,7 @@ async function openQuotation(id){
   document.getElementById('f_valid_until').value = quote.valid_until || '';
   document.getElementById('f_sales_rep').value = quote.sales_rep || '';
   document.getElementById('f_client_name').value = quote.client_name || '';
-  document.getElementById('f_contact_person').value = quote.contact_person || '';
+  document.getElementById('contact_person' in quote ? 'f_contact_person' : 'f_contact_person').value = quote.contact_person || '';
   document.getElementById('f_tax_id').value = quote.tax_id || '';
   document.getElementById('f_phone').value = quote.phone || '';
   document.getElementById('f_address').value = quote.address || '';
@@ -1968,8 +2034,13 @@ async function openQuotation(id){
   }));
   renderItems();
   recalcTotals();
-  setLocked(!!quote.locked);
-  document.getElementById('deleteBtn').style.display = quote.status === 'draft' ? 'inline-flex' : 'none';
+
+  // 業務人員權限判定：非自己開的單進入後直接唯讀鎖定
+  const isOwner = quote.user_id === currentUser.id;
+  const canEdit = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+
+  setLocked(!!quote.locked || !canEdit);
+  document.getElementById('deleteBtn').style.display = (quote.status === 'draft' && canEdit) ? 'inline-flex' : 'none';
   switchPanel('panel-editor');
 }
 
@@ -1980,11 +2051,19 @@ async function duplicateQuotation(id){
   setLocked(false);
   document.getElementById('quoteNoDisplay').textContent = '自動產生（複製自舊報價單）';
   document.getElementById('deleteBtn').style.display = 'none';
-  toast('已複製內容，儲存後將產生新編號');
+  toast('已複製內容，儲存後將產生新編號並歸屬至你的帳號');
 }
 
 async function deleteQuotation(){
   if(!currentQuote){ return; }
+  
+  const isOwner = currentQuote.user_id === currentUser.id;
+  const canDelete = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+  if(!canDelete){
+    toast('權限不足：業務人員只能刪除自己開立的草稿報價單', true);
+    return;
+  }
+
   if(currentQuote.status !== 'draft'){ toast('只有草稿狀態可以刪除', true); return; }
   if(!confirm('確定要刪除這張草稿報價單嗎？此動作無法復原。')) return;
   const { error } = await sb.from('quotations').delete().eq('id', currentQuote.id);
@@ -1996,6 +2075,12 @@ async function deleteQuotation(){
 
 async function unlockQuote(){
   if(!currentQuote) return;
+  const isOwner = currentQuote.user_id === currentUser.id;
+  const canUnlock = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+  if(!canUnlock){
+    toast('權限不足：無法解鎖他人建立的報價單', true);
+    return;
+  }
   if(!confirm('確定要解鎖這張已接受的報價單嗎？解鎖後可再次編輯。')) return;
   const { error } = await sb.from('quotations').update({ locked:false }).eq('id', currentQuote.id);
   if(error){ toast('解鎖失敗：' + error.message, true); return; }
