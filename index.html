@@ -62,10 +62,11 @@
   }
   .btn{
     display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    padding:9px 16px;border-radius:5px;border:1px solid transparent;
+    padding:9px 18px;border-radius:5px;border:1px solid transparent;
     font-size:13.5px;font-weight:500;transition:background .12s,border-color .12s;
+    width:auto;
   }
-  .btn-primary{background:var(--brand);color:#fff;width:100%;}
+  .btn-primary{background:var(--brand);color:#fff;}
   .btn-primary:hover{background:var(--brand-dark);}
   .btn-line{background:#fff;border-color:var(--border);color:var(--ink);}
   .btn-line:hover{border-color:var(--brand);color:var(--brand);}
@@ -109,12 +110,13 @@
   .main{flex:1;min-width:0;display:flex;flex-direction:column;}
   .topbar{
     display:flex;align-items:center;justify-content:space-between;
-    padding:18px 28px;border-bottom:1px solid var(--border);background:var(--surface);
+    padding:18px 36px;border-bottom:1px solid var(--border);background:var(--surface);
   }
   .topbar h1{font-size:17px;margin:0;font-weight:700;}
   .topbar .desc{font-size:12.5px;color:var(--muted);margin-top:2px;}
-  .content{padding:24px 28px;overflow-y:auto;flex:1;}
-  .panel{display:none;}
+  
+  .content{padding:28px 36px;overflow-y:auto;flex:1;}
+  .panel{display:none;max-width:1200px;margin:0 auto;}
   .panel.active{display:block;}
 
   .card{
@@ -133,13 +135,24 @@
   }
   td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
   tr:last-child td{border-bottom:none;}
-  .items-table input, .items-table select{padding:6px 8px;font-size:13px;}
-  .items-table td.num-col{width:110px;}
-  .items-table td.remove-col{width:36px;}
+  
+  /* 服務項目表格精準比例排版 */
+  .items-table{width:100%;table-layout:fixed;}
+  .items-table th:nth-child(1){width:130px;}
+  .items-table th:nth-child(2){width:24%;}
+  .items-table th:nth-child(3){width:auto;}
+  .items-table th:nth-child(4){width:65px;}
+  .items-table th:nth-child(5){width:85px;}
+  .items-table th:nth-child(6){width:115px;}
+  .items-table th:nth-child(7){width:115px;}
+  .items-table th:nth-child(8){width:42px;}
+  
+  .items-table input, .items-table select{padding:6px 8px;font-size:13px;width:100%;}
   .items-table input.qty, .items-table input.price{text-align:right;}
+  .items-table td.num-col{text-align:right;}
   .row-remove{
     width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:#fff;
-    color:var(--muted);font-size:14px;line-height:1;
+    color:var(--muted);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
   }
   .row-remove:hover{border-color:var(--rejected);color:var(--rejected);}
 
@@ -172,6 +185,15 @@
   }
 
   .empty-state{text-align:center;padding:50px 20px;color:var(--muted);font-size:13.5px;}
+
+  .panel-actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    margin-top:20px;
+    padding-bottom:30px;
+    flex-wrap:wrap;
+  }
 
   .modal-overlay{
     position:fixed;inset:0;background:rgba(16,38,42,.45);display:none;
@@ -234,6 +256,7 @@
     .sidebar .brand .title,.sidebar .brand .sub,.nav-item span.label,.user-chip{display:none;}
     .grid2,.grid3{grid-template-columns:1fr;}
     .content{padding:16px;}
+    .items-table{display:block;overflow-x:auto;}
   }
 </style>
 </head>
@@ -258,7 +281,7 @@
       <label>Supabase Anon Public Key</label>
       <input type="text" id="setupKey" placeholder="eyJhbGciOi...">
     </div>
-    <button class="btn btn-primary" onclick="saveConnection()">儲存並連線</button>
+    <button class="btn btn-primary" onclick="saveConnection()" style="width:100%;">儲存並連線</button>
     <div class="hint">這組設定只會存在瀏覽器（localStorage），不會外流。帳號請由管理員在 Supabase 後台建立。</div>
   </div>
 </div>
@@ -282,7 +305,7 @@
       <label>密碼</label>
       <input type="password" id="loginPassword" autocomplete="current-password">
     </div>
-    <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">登入</button>
+    <button class="btn btn-primary" onclick="doLogin()" id="loginBtn" style="width:100%;">登入</button>
     <div class="hint">尚未有帳號？請洽系統管理員於後台建立，本系統不開放自行註冊。</div>
   </div>
 </div>
@@ -355,14 +378,14 @@
           <table class="items-table">
             <thead>
               <tr>
-                <th style="width:120px;">類別</th>
+                <th>類別</th>
                 <th>項目名稱</th>
                 <th>說明</th>
-                <th style="width:64px;">單位</th>
-                <th class="num-col">數量</th>
-                <th class="num-col">單價</th>
-                <th class="num-col">小計</th>
-                <th class="remove-col"></th>
+                <th>單位</th>
+                <th style="text-align:right;">數量</th>
+                <th style="text-align:right;">單價</th>
+                <th style="text-align:right;">小計</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="itemsBody"></tbody>
@@ -403,7 +426,7 @@
           </div>
         </div>
 
-        <div style="display:flex;gap:10px;">
+        <div class="panel-actions">
           <button class="btn btn-primary" id="saveBtn" onclick="saveQuotation()">儲存報價單</button>
           <button class="btn btn-line" onclick="saveAsNew()">另存新報價單</button>
           <button class="btn btn-line" onclick="printQuotation()">列印／匯出 PDF</button>
@@ -547,10 +570,8 @@
 const DEFAULT_SB_URL = 'https://jkhdalsqdjugcweepvmt.supabase.co';
 const DEFAULT_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpraGRhbHNxZGp1Z2N3ZWVwdm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5ODc4MDcsImV4cCI6MjEwNDU2MzgwN30.ryURSFwu5gEYwk0gqvFgdP-fP-7jlN3ReH37CbzKW8o';
 
-// 管理員名單備援（確保即使 RLS 阻擋查詢，前端依然精確識別管理員權限）
 const ADMIN_EMAILS = ['willy.k@usis.com.tw'];
 
-// 產品清單預設資料庫
 const DEFAULT_CATALOG = [
   { category:'ISO驗證', item_name:'資訊安全管理系統', description:'ISO/IEC 27001 · ISMS', unit:'式', default_price:0 },
   { category:'個人資料保護', item_name:'隱私資訊管理系統', description:'ISO/IEC 27701 · PIMS', unit:'式', default_price:0 },
@@ -680,7 +701,6 @@ async function doLogout(){
 
 async function afterLogin(){
   try{
-    // 角色權限判斷（結合 Supabase 表與管理員 Email 保底）
     let role = 'staff';
     if(ADMIN_EMAILS.includes(currentUser.email?.toLowerCase())){
       role = 'admin';
@@ -689,7 +709,7 @@ async function afterLogin(){
       const { data: pById } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
       if(pById && pById.role) role = pById.role;
     }catch(err){
-      console.warn('Profiles query failed, fallback used:', err);
+      console.warn('Profiles query fallback used:', err);
     }
 
     currentProfile = { role, email: currentUser.email };
@@ -821,7 +841,7 @@ function renderCatalog(){
       <td><b>${escapeHtml(item.item_name)}</b></td>
       <td>${escapeHtml(item.description||'')}</td>
       <td>${escapeHtml(item.unit||'式')}</td>
-      <td class="num">${money(item.default_price)}</td>
+      <td class="num" style="text-align:right;">${money(item.default_price)}</td>
       <td>${item.id ? `<button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')">刪除</button>` : ''}</td>`;
     body.appendChild(tr);
   });
@@ -918,10 +938,10 @@ function renderItems(){
       <td><input type="text" value="${escapeAttr(row.item_name)}" placeholder="項目名稱" onchange="updateItem('${row.rowId}','item_name',this.value)"></td>
       <td><input type="text" value="${escapeAttr(row.description)}" placeholder="規格/說明" onchange="updateItem('${row.rowId}','description',this.value)"></td>
       <td><input type="text" value="${escapeAttr(row.unit)}" onchange="updateItem('${row.rowId}','unit',this.value)"></td>
-      <td class="num-col"><input type="number" class="qty" value="${row.quantity}" min="0" onchange="updateItem('${row.rowId}','quantity',this.value)"></td>
-      <td class="num-col"><input type="number" class="price" value="${row.unit_price}" min="0" onchange="updateItem('${row.rowId}','unit_price',this.value)"></td>
+      <td><input type="number" class="qty" value="${row.quantity}" min="0" onchange="updateItem('${row.rowId}','quantity',this.value)"></td>
+      <td><input type="number" class="price" value="${row.unit_price}" min="0" onchange="updateItem('${row.rowId}','unit_price',this.value)"></td>
       <td class="num-col num">${money(row.quantity * row.unit_price)}</td>
-      <td class="remove-col"><button class="row-remove" onclick="removeItemRow('${row.rowId}')">✕</button></td>`;
+      <td><button class="row-remove" onclick="removeItemRow('${row.rowId}')">✕</button></td>`;
     tr.querySelector('select').value = row.category;
     body.appendChild(tr);
   });
