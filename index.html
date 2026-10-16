@@ -1497,6 +1497,9 @@ function switchPanel(id){
   if(target) target.classList.add('active');
   const nav = document.querySelector(`.nav-item[data-panel="${id}"]`);
   if(nav) nav.classList.add('active');
+  // 僅捲動主內容區，避免瀏覽器將整個固定版面推離可視範圍
+  document.querySelector('.content')?.scrollTo({top:0,behavior:'instant'});
+  window.scrollTo(0,0);
 
   const titles = {
     'panel-editor':['新增報價單','建立報價單並存檔'],
@@ -1847,7 +1850,7 @@ function editNoteTemplate(id){
  document.getElementById('template_active').checked=t.is_active;
  document.getElementById('template_default').checked=t.is_default;
  document.getElementById('templateFormTitle').textContent='編輯條款範本';
- document.getElementById('templateEditCard').scrollIntoView({behavior:'smooth',block:'start'});
+ document.querySelector('.content')?.scrollTo({top:0,behavior:'smooth'});
 }
 async function saveNoteTemplate(){
  if(!canManageNoteTemplates())return toast('權限不足',true);
