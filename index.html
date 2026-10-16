@@ -505,7 +505,7 @@
           <div class="grid3">
             <div class="field"><label>客戶公司名稱 *</label><input type="text" id="cli_name"></div>
             <div class="field"><label>聯絡人</label><input type="text" id="cli_contact"></div>
-            <div class="field"><label>統一編號</label><input type="text" id="cli_tax"></div>
+            <div class="field"><label>統一編號</label><div style="display:flex;gap:8px;align-items:center;"><input type="text" id="cli_tax" inputmode="numeric" maxlength="8" placeholder="8 碼統編" style="min-width:0;flex:1;"><button type="button" class="btn btn-line btn-sm" id="cliLookupBtn" onclick="lookupCompanyByTaxId()" style="white-space:nowrap;flex:none;">查詢公司</button></div><div class="hint" id="cliLookupStatus" role="status" aria-live="polite">查詢經濟部公司登記資料，結果可自行修改。</div></div>
           </div>
           <div class="grid3">
             <div class="field"><label>電話</label><input type="text" id="cli_phone"></div>
@@ -1192,6 +1192,41 @@ function renderClientsList(){
       </td>`;
     body.appendChild(tr);
   });
+}
+
+async function lookupCompanyByTaxId(){
+ const tax=document.getElementById('cli_tax').value.trim();
+ const status=document.getElementById('cliLookupStatus');
+ const btn=document.getElementById('cliLookupBtn');
+ if(!/^\\d{8}$/.test(tax)){status.textContent='請輸入完整的 8 碼統一編號。';toast('統編格式須為 8 碼數字',true);return;}
+ const existing=clients.find(c=>String(c.tax_id||'').trim()===tax);
+ if(existing){status.textContent='此統編已存在客戶資料庫：'+existing.company_name+'，請勿重複建立。';toast('此統編已存在客戶資料庫',true);return;}
+ btn.disabled=true;btn.textContent='查詢中...';status.textContent='正在向經濟部商工資料 API 查詢...';
+ try{
+  const endpoint='https://data.gcis.nat.gov.tw/od/data/api/5F64D864-61CB-4D0D-8AD9-492047CC1EA6';
+  const url=endpoint+'?$format=json&$filter='+encodeURIComponent('Business_Accounting_NO eq '+tax)+'&$skip=0&$top=1';
+  const response=await fetch(url,{method:'GET',headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw new Error('政府 API 回應 HTTP '+response.status);
+  const payload=await response.json();
+  const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.data)?payload.data:Array.isArray(payload?.value)?payload.value:[]);
+  const company=rows.find(x=>String(x.Business_Accounting_NO||'').padStart(8,'0')===tax);
+  if(!company){status.textContent='查無此統編的公司登記資料；若為行號或其他組織，請手動輸入。';return;}
+  const name=company.Company_Name||'';
+  const address=company.Company_Location||'';
+  if(!name&&!address)throw new Error('API 未提供公司名稱或地址欄位');
+  const nameEl=document.getElementById('cli_name'),addrEl=document.getElementById('cli_address');
+  if((nameEl.value.trim()&&nameEl.value.trim()!==name)||(addrEl.value.trim()&&addrEl.value.trim()!==address)){
+   if(!confirm('查詢結果將覆蓋已輸入的公司名稱或地址，確定套用嗎？')){status.textContent='已取消帶入，原資料保留。';return;}
+  }
+  if(name)nameEl.value=name;
+  if(address)addrEl.value=address;
+  status.textContent='已帶入政府公司登記資料；請確認地址是否為實際聯絡地址。';
+  toast('公司資料查詢成功');
+ }catch(e){
+  console.error('公司統編查詢失敗',e);
+  status.textContent='政府 API 查詢失敗（可能為跨來源 CORS 或連線限制），請先手動填寫。';
+  toast('查詢失敗：'+e.message,true);
+ }finally{btn.disabled=false;btn.textContent='查詢公司';}
 }
 
 async function addNewClient(){
