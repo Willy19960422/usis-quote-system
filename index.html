@@ -415,6 +415,7 @@
                 <th>單位</th>
                 <th style="text-align:right;">數量</th>
                 <th style="text-align:right;">單價</th>
+                <th>贈送</th>
                 <th style="text-align:right;">小計</th>
                 <th></th>
               </tr>
@@ -439,7 +440,7 @@
         </div>
 
         <div class="card">
-          <h2>備註／條款</h2>
+          <h2>備註／條款</h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><button type="button" class="btn btn-line btn-sm" id="manageNoteTemplatesBtn" style="display:none" onclick="manageNoteTemplates()">管理範本</button></div>
           <div class="field" style="margin-bottom:0;">
             <textarea id="f_notes" rows="5"></textarea>
           </div>
@@ -863,6 +864,7 @@ let currentUser = null;
 let currentProfile = null;
 let companySettings = { company_name:'優士國際資安股份有限公司', address:'', phone:'', tax_id:'', bank_info:'', default_tax_rate:5, quote_prefix:'QT' };
 let catalog = [];
+let noteTemplates = [];
 let quotations = [];
 let clients = [];
 let teamProfiles = [];
@@ -1041,6 +1043,7 @@ async function afterLogin(){
 
     await loadCompanySettings();
     await loadCatalog();
+    await loadNoteTemplates();
     await loadQuotations();
     await loadClients();
     if(role === 'admin') await loadTeamProfiles();
@@ -1754,6 +1757,57 @@ function addItemRow(prefill){
   recalcTotals();
 }
 
+
+async function loadNoteTemplates(){
+ const {data,error}=await sb.from('quote_note_templates').select('*').order('sort_order').order('name');
+ if(error){toast('條款範本載入失敗：'+error.message,true);return;}
+ noteTemplates=data||[];
+ const el=document.getElementById('f_note_template');
+ el.innerHTML='<option value="">自行輸入</option>';
+ noteTemplates.filter(t=>t.is_active).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name+(t.is_default?'（預設）':'');el.appendChild(o);});
+ document.getElementById('manageNoteTemplatesBtn').style.display=['admin','manager'].includes(currentProfile?.role)?'inline-block':'none';
+}
+function applyNoteTemplate(id){
+ const t=noteTemplates.find(t=>t.id===id);if(!t)return;
+ const el=document.getElementById('f_notes');
+ if(el.value.trim()&&el.value!==t.content&&!confirm('套用範本會覆蓋現有備註，確定嗎？')){document.getElementById('f_note_template').value='';return;}
+ el.value=t.content;
+}
+function applyDefaultNoteTemplate(){
+ const t=noteTemplates.find(t=>t.is_default&&t.is_active);
+ document.getElementById('f_note_template').value=t?.id||'';
+ if(t)document.getElementById('f_notes').value=t.content;
+}
+async function manageNoteTemplates(){
+ if(!['admin','manager'].includes(currentProfile?.role))return;
+ const action=prompt('條款範本：1 新增、2 修改、3 刪除、4 設為預設');
+ if(!['1','2','3','4'].includes(action))return;
+ try{
+  if(action==='1'){
+   const name=prompt('範本名稱');if(!name?.trim())return;
+   const content=prompt('範本內容','');if(content===null)return;
+   const {error}=await sb.from('quote_note_templates').insert({name:name.trim(),content});if(error)throw error;
+  }else{
+   const list=noteTemplates.map((t,i)=>(i+1)+'. '+t.name).join('\n');
+   const t=noteTemplates[Number(prompt('選擇範本編號：\n'+list))-1];if(!t)return;
+   if(action==='2'){
+    const name=prompt('範本名稱',t.name);if(!name?.trim())return;
+    const content=prompt('範本內容',t.content);if(content===null)return;
+    const {error}=await sb.from('quote_note_templates').update({name:name.trim(),content}).eq('id',t.id);if(error)throw error;
+   }else if(action==='3'){
+    if(!confirm('確定刪除「'+t.name+'」？'))return;
+    const {error}=await sb.from('quote_note_templates').delete().eq('id',t.id);if(error)throw error;
+   }else{
+    if(t.is_default)return;
+    const old=noteTemplates.find(x=>x.is_default);
+    if(old){const {error}=await sb.from('quote_note_templates').update({is_default:false}).eq('id',old.id);if(error)throw error;}
+    const {error}=await sb.from('quote_note_templates').update({is_default:true,is_active:true}).eq('id',t.id);if(error)throw error;
+   }
+  }
+  await loadNoteTemplates();toast('條款範本已更新');
+ }catch(e){toast('範本操作失敗：'+e.message,true);}
+}
+
 /* ================= 報價單編輯器 ================= */
 function blankItemRow(prefill){
   itemSeq++;
@@ -1765,7 +1819,8 @@ function blankItemRow(prefill){
     description: prefill?.description || '', 
     unit: prefill?.unit || '式', 
     quantity: 1, 
-    unit_price: prefill?.default_price || 0 
+    unit_price: prefill?.default_price || 0,
+    is_gift: false 
   };
 }
 let editorItems = [];
@@ -1787,6 +1842,7 @@ function resetEditor(){
   document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
   document.getElementById('f_notes').value = '報價單有效期限為 30 天。\n付款方式：驗收後 30 天內匯款。\n本報價不含未列項目之額外費用。';
   document.getElementById('f_status').value = 'draft';
+  applyDefaultNoteTemplate();
   editorItems = [blankItemRow()];
   renderItems();
   recalcTotals();
@@ -1814,7 +1870,7 @@ function renderItems(){
       <td><input type="text" value="${escapeAttr(row.unit)}" onchange="updateItem('${row.rowId}','unit',this.value)"></td>
       <td><input type="number" class="qty" value="${row.quantity}" min="0" onchange="updateItem('${row.rowId}','quantity',this.value)"></td>
       <td><input type="number" class="price" value="${row.unit_price}" min="0" onchange="updateItem('${row.rowId}','unit_price',this.value)"></td>
-      <td class="num-col num">${money(row.quantity * row.unit_price)}</td>
+      <td><input type="checkbox" aria-label="贈送" ${row.is_gift ? 'checked' : ''} onchange="updateItem('${row.rowId}','is_gift',this.checked)"></td><td class="num-col num">${row.is_gift ? '贈送' : money(row.quantity * row.unit_price)}</td>
       <td><button class="row-remove" onclick="removeItemRow('${row.rowId}')">✕</button></td>`;
     tr.querySelector('select').value = row.category;
     body.appendChild(tr);
@@ -1824,7 +1880,7 @@ function renderItems(){
 function updateItem(rowId, field, value){
   const row = editorItems.find(r=>r.rowId===rowId);
   if(!row) return;
-  row[field] = (field==='quantity'||field==='unit_price') ? Number(value)||0 : value;
+  row[field] = field==='is_gift' ? Boolean(value) : (field==='quantity'||field==='unit_price') ? Number(value)||0 : value;
   renderItems();
   recalcTotals();
 }
@@ -1836,7 +1892,7 @@ function removeItemRow(rowId){
   recalcTotals();
 }
 function recalcTotals(){
-  const subtotal = editorItems.reduce((s,r)=> s + (r.quantity*r.unit_price), 0);
+  const subtotal = editorItems.reduce((s,r)=> s + (r.is_gift ? 0 : r.quantity*r.unit_price), 0);
   const taxRate = Number(document.getElementById('f_tax_rate').value)||0;
   const tax = Math.round(subtotal * taxRate / 100);
   const total = subtotal + tax;
@@ -1854,6 +1910,7 @@ function setLocked(locked){
     if(el) el.disabled = locked;
   });
   document.querySelectorAll('#itemsBody input, #itemsBody select').forEach(el=> el.disabled = locked);
+  document.getElementById('f_note_template').disabled = locked;
   document.getElementById('saveBtn').disabled = locked;
 }
 
@@ -1918,7 +1975,7 @@ async function saveQuotation(){
 
     const itemRows = editorItems.filter(r=>r.item_name.trim()).map((r,i)=>({
       quotation_id: quoteId, category:r.category, item_name:r.item_name, description:r.description,
-      unit:r.unit, quantity:r.quantity, unit_price:r.unit_price, subtotal:r.quantity*r.unit_price, sort_order:i,
+      unit:r.unit, quantity:r.quantity, unit_price:r.unit_price, is_gift:!!r.is_gift, subtotal:r.is_gift ? 0 : r.quantity*r.unit_price, sort_order:i,
     }));
     const { error: itemErr } = await sb.from('quotation_items').insert(itemRows);
     if(itemErr) throw itemErr;
@@ -2021,6 +2078,7 @@ async function openQuotation(id){
   document.getElementById('f_email').value = quote.email || '';
   document.getElementById('f_tax_rate').value = quote.tax_rate ?? 5;
   document.getElementById('f_notes').value = quote.notes || '';
+   document.getElementById('f_note_template').value = '';
   document.getElementById('f_status').value = quote.status || 'draft';
 
   editorItems = (items && items.length ? items : [{}]).map(it => ({
@@ -2031,6 +2089,7 @@ async function openQuotation(id){
     unit: it.unit || '式',
     quantity: it.quantity ?? 1,
     unit_price: it.unit_price ?? 0,
+    is_gift: !!it.is_gift,
   }));
   renderItems();
   recalcTotals();
@@ -2108,7 +2167,7 @@ function printQuotation(){
   itemsBody.innerHTML = '';
   editorItems.filter(r=>r.item_name.trim()).forEach(r=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td><b>${escapeHtml(r.item_name)}</b></td><td>${escapeHtml(r.description)}</td><td>${escapeHtml(r.unit)}</td><td>${r.quantity}</td><td>${money(r.unit_price)}</td><td>${money(r.quantity*r.unit_price)}</td>`;
+    tr.innerHTML = `<td><b>${escapeHtml(r.item_name)}</b></td><td>${escapeHtml(r.description)}</td><td>${escapeHtml(r.unit)}</td><td>${r.quantity}</td><td>${money(r.unit_price)}</td><td>${r.is_gift ? "方案贈送" : money(r.quantity*r.unit_price)}</td>`;
     itemsBody.appendChild(tr);
   });
   document.getElementById('p_subtotal').textContent = money(data.subtotal);
