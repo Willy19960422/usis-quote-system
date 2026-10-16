@@ -355,6 +355,7 @@
     <button class="nav-item" data-panel="panel-list" onclick="switchPanel('panel-list')">📋 <span class="label">報價單列表</span></button>
     <button class="nav-item" data-panel="panel-clients" onclick="switchPanel('panel-clients')">🏢 <span class="label">客戶資料管理</span></button>
     <button class="nav-item" data-panel="panel-catalog" onclick="switchPanel('panel-catalog')">🗂 <span class="label">服務項目管理</span></button>
+    <button class="nav-item" data-panel="panel-templates" onclick="switchPanel('panel-templates')">📑 <span class="label">條款範本管理</span></button>
     <button class="nav-item" data-panel="panel-settings" onclick="switchPanel('panel-settings')">⚙️ <span class="label">設定</span></button>
     <div class="sidebar-foot">
       <div class="user-chip">
@@ -444,7 +445,7 @@
         </div>
 
         <div class="card">
-          <h2>備註／條款</h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><button type="button" class="btn btn-line btn-sm" id="manageNoteTemplatesBtn" style="display:none" onclick="manageNoteTemplates()">管理範本</button></div>
+          <h2>備註／條款</h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select></div>
           <div class="field" style="margin-bottom:0;">
             <textarea id="f_notes" rows="5"></textarea>
           </div>
@@ -573,6 +574,29 @@
             <tbody id="catalogBody"></tbody>
           </table>
           <div class="empty-state" id="catalogEmpty" style="display:none;">目錄目前是空的</div>
+        </div>
+      </div>
+
+      <!-- 條款範本管理 -->
+      <div class="panel" id="panel-templates">
+        <div class="card" id="templateEditCard" style="display:none;">
+          <h2 id="templateFormTitle">新增條款範本</h2>
+          <input type="hidden" id="template_edit_id">
+          <div class="field"><label>範本名稱 *</label><input id="template_name" type="text" placeholder="例如：ISO 驗證方案"></div>
+          <div class="field" style="margin-top:12px;"><label>條款內容 *</label><textarea id="template_content" rows="6" placeholder="輸入報價條款"></textarea></div>
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:12px 0;">
+            <label><input type="checkbox" id="template_active" checked> 啟用範本</label>
+            <label><input type="checkbox" id="template_default"> 設為預設範本</label>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="saveNoteTemplate()">儲存範本</button>
+            <button class="btn btn-line btn-sm" onclick="resetNoteTemplateForm()">取消編輯</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow-x:auto;">
+          <table><thead><tr><th>範本名稱</th><th>條款內容預覽</th><th>狀態</th><th>預設</th><th style="width:150px;">操作</th></tr></thead>
+          <tbody id="templatesBody"></tbody></table>
+          <div class="empty-state" id="templatesEmpty" style="display:none;">尚無條款範本，管理員或經理可在上方新增。</div>
         </div>
       </div>
 
@@ -1479,6 +1503,7 @@ function switchPanel(id){
     'panel-list':['報價單列表','檢視、搜尋與管理已建立的報價單'],
     'panel-clients':['客戶資料管理','管理內部常用客戶與聯絡資料庫'],
     'panel-catalog':['服務項目管理','管理可重複使用的服務項目目錄'],
+    'panel-templates':['條款範本管理','建立及管理報價單常用條款'],
     'panel-settings':['設定','個人業務、公司資訊與成員權限設定'],
   };
   if(titles[id]){
@@ -1489,6 +1514,7 @@ function switchPanel(id){
   if(id === 'panel-list') renderList();
   if(id === 'panel-clients') renderClientsList();
   if(id === 'panel-catalog') renderCatalog();
+  if(id === 'panel-templates') renderNoteTemplates();
   if(id === 'panel-settings') {
     switchSettingsTab('tab-profile');
   }
@@ -1769,7 +1795,7 @@ async function loadNoteTemplates(){
  const el=document.getElementById('f_note_template');
  el.innerHTML='<option value="">自行輸入</option>';
  noteTemplates.filter(t=>t.is_active).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name+(t.is_default?'（預設）':'');el.appendChild(o);});
- document.getElementById('manageNoteTemplatesBtn').style.display=['admin','manager'].includes(currentProfile?.role)?'inline-block':'none';
+ renderNoteTemplates();
 }
 function applyNoteTemplate(id){
  const t=noteTemplates.find(t=>t.id===id);if(!t)return;
@@ -1782,34 +1808,75 @@ function applyDefaultNoteTemplate(){
  document.getElementById('f_note_template').value=t?.id||'';
  if(t)document.getElementById('f_notes').value=t.content;
 }
-async function manageNoteTemplates(){
- if(!['admin','manager'].includes(currentProfile?.role))return;
- const action=prompt('條款範本：1 新增、2 修改、3 刪除、4 設為預設');
- if(!['1','2','3','4'].includes(action))return;
+function canManageNoteTemplates(){return ['admin','manager'].includes(currentProfile?.role);}
+function resetNoteTemplateForm(){
+ document.getElementById('template_edit_id').value='';
+ document.getElementById('template_name').value='';
+ document.getElementById('template_content').value='';
+ document.getElementById('template_active').checked=true;
+ document.getElementById('template_default').checked=false;
+ document.getElementById('templateFormTitle').textContent='新增條款範本';
+}
+function renderNoteTemplates(){
+ const body=document.getElementById('templatesBody');if(!body)return;
+ const canEdit=canManageNoteTemplates();
+ document.getElementById('templateEditCard').style.display=canEdit?'block':'none';
+ document.getElementById('templatesEmpty').style.display=noteTemplates.length?'none':'block';
+ body.replaceChildren();
+ noteTemplates.forEach(t=>{
+  const tr=document.createElement('tr');
+  const cell=(value)=>{const td=document.createElement('td');td.textContent=value;tr.appendChild(td);return td;};
+  cell(t.name);
+  const preview=cell(t.content);preview.style.whiteSpace='pre-line';preview.style.maxWidth='400px';preview.style.overflowWrap='anywhere';
+  cell(t.is_active?'啟用':'停用');cell(t.is_default?'預設':'—');
+  const action=document.createElement('td');
+  if(canEdit){
+   const edit=document.createElement('button');edit.className='btn btn-line btn-sm';edit.textContent='編輯';edit.onclick=()=>editNoteTemplate(t.id);
+   const del=document.createElement('button');del.className='btn btn-line btn-sm';del.textContent='刪除';del.style.marginLeft='6px';del.onclick=()=>deleteNoteTemplate(t.id);
+   action.append(edit,del);
+  }else action.textContent='僅供查看';
+  tr.appendChild(action);body.appendChild(tr);
+ });
+}
+function editNoteTemplate(id){
+ if(!canManageNoteTemplates())return;
+ const t=noteTemplates.find(x=>x.id===id);if(!t)return;
+ document.getElementById('template_edit_id').value=t.id;
+ document.getElementById('template_name').value=t.name;
+ document.getElementById('template_content').value=t.content;
+ document.getElementById('template_active').checked=t.is_active;
+ document.getElementById('template_default').checked=t.is_default;
+ document.getElementById('templateFormTitle').textContent='編輯條款範本';
+ document.getElementById('templateEditCard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function saveNoteTemplate(){
+ if(!canManageNoteTemplates())return toast('權限不足',true);
+ const id=document.getElementById('template_edit_id').value;
+ const name=document.getElementById('template_name').value.trim();
+ const content=document.getElementById('template_content').value;
+ const is_active=document.getElementById('template_active').checked;
+ const is_default=document.getElementById('template_default').checked;
+ if(!name||!content.trim())return toast('請填寫範本名稱與內容',true);
+ if(is_default&&!is_active)return toast('預設範本必須啟用',true);
+ const payload={name,content,is_active,is_default};
  try{
-  if(action==='1'){
-   const name=prompt('範本名稱');if(!name?.trim())return;
-   const content=prompt('範本內容','');if(content===null)return;
-   const {error}=await sb.from('quote_note_templates').insert({name:name.trim(),content});if(error)throw error;
-  }else{
-   const list=noteTemplates.map((t,i)=>(i+1)+'. '+t.name).join('\n');
-   const t=noteTemplates[Number(prompt('選擇範本編號：\n'+list))-1];if(!t)return;
-   if(action==='2'){
-    const name=prompt('範本名稱',t.name);if(!name?.trim())return;
-    const content=prompt('範本內容',t.content);if(content===null)return;
-    const {error}=await sb.from('quote_note_templates').update({name:name.trim(),content}).eq('id',t.id);if(error)throw error;
-   }else if(action==='3'){
-    if(!confirm('確定刪除「'+t.name+'」？'))return;
-    const {error}=await sb.from('quote_note_templates').delete().eq('id',t.id);if(error)throw error;
-   }else{
-    if(t.is_default)return;
-    const old=noteTemplates.find(x=>x.is_default);
-    if(old){const {error}=await sb.from('quote_note_templates').update({is_default:false}).eq('id',old.id);if(error)throw error;}
-    const {error}=await sb.from('quote_note_templates').update({is_default:true,is_active:true}).eq('id',t.id);if(error)throw error;
-   }
+  // 單一預設範本的唯一索引要求先取消舊預設
+  if(is_default){
+   const old=noteTemplates.find(t=>t.is_default&&t.id!==id);
+   if(old){const {error}=await sb.from('quote_note_templates').update({is_default:false}).eq('id',old.id);if(error)throw error;}
   }
-  await loadNoteTemplates();toast('條款範本已更新');
- }catch(e){toast('範本操作失敗：'+e.message,true);}
+  const query=id?sb.from('quote_note_templates').update(payload).eq('id',id):sb.from('quote_note_templates').insert(payload);
+  const {error}=await query;if(error)throw error;
+  await loadNoteTemplates();resetNoteTemplateForm();toast('條款範本已儲存');
+ }catch(e){toast('儲存失敗：'+e.message,true);}
+}
+async function deleteNoteTemplate(id){
+ if(!canManageNoteTemplates())return toast('權限不足',true);
+ const t=noteTemplates.find(x=>x.id===id);if(!t)return;
+ if(!confirm('確定刪除「'+t.name+'」？已儲存報價不受影響。'))return;
+ const {error}=await sb.from('quote_note_templates').delete().eq('id',id);
+ if(error)return toast('刪除失敗：'+error.message,true);
+ await loadNoteTemplates();resetNoteTemplateForm();toast('條款範本已刪除');
 }
 
 /* ================= 報價單編輯器 ================= */
