@@ -944,6 +944,7 @@
   </table>
   <table class="p-totals">
     <tr><td>小計</td><td style="text-align:right;" id="p_subtotal"></td></tr>
+    <tr id="p_discount_row" style="display:none"><td id="p_discount_label">折扣</td><td style="text-align:right;" id="p_discount"></td></tr>
     <tr><td id="p_tax_label">稅額</td><td style="text-align:right;" id="p_tax"></td></tr>
     <tr class="grand"><td>總計</td><td style="text-align:right;" id="p_total"></td></tr>
   </table>
@@ -2131,7 +2132,7 @@ function resetEditor(){
   currentQuote = null;
   document.getElementById('quoteNoDisplay').textContent = '自動產生';
   document.getElementById('f_issue_date').value = todayStr();
-  document.getElementById('f_valid_until').value = plusDays(30);
+  document.getElementById('f_valid_until').value = plusDays(15);
   
   document.getElementById('f_sales_rep').value = currentProfile?.display_name || '';
   
@@ -2144,7 +2145,7 @@ function resetEditor(){
   document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
   document.getElementById('f_discount_type').value = 'none';
   document.getElementById('f_discount_value').value = 0;
-  document.getElementById('f_notes').value = '報價單有效期限為 30 天。\n付款方式：驗收後 30 天內匯款。\n本報價不含未列項目之額外費用。';
+  document.getElementById('f_notes').value = '有效期限：15天\n付款條件：二期付款（總價金之50%、50%）\n第一期：訂單確認後，七日內以匯款或即期支票。\n第二期：驗證通過，尾款付清後交付證書及 IAF 可查詢。';
   document.getElementById('f_status').value = 'draft';
   applyDefaultNoteTemplate();
   editorItems = [blankItemRow()];
@@ -2556,6 +2557,9 @@ function printQuotation(){
     itemsBody.appendChild(tr);
   });
   document.getElementById('p_subtotal').textContent = money(data.subtotal);
+  document.getElementById('p_discount_row').style.display = data.discount_amount>0 ? 'table-row':'none';
+  document.getElementById('p_discount_label').textContent = data.discount_type==='percent' ? '折扣（'+data.discount_value+'%）' : '折扣';
+  document.getElementById('p_discount').textContent = '-'+money(data.discount_amount);
   document.getElementById('p_tax_label').textContent = `稅額（${data.tax_rate}%）`;
   document.getElementById('p_tax').textContent = money(data.tax_amount);
   document.getElementById('p_total').textContent = money(data.total);
