@@ -513,7 +513,26 @@
         <div class="card">
           <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" onclick="switchPanel('panel-templates')">管理付款條件／條款範本</button><span style="font-size:12px;color:#64736e">管理員／經理可設定預設條款</span></div><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><div style="margin-top:6px;font-size:12px;color:#64736e">管理員／經理可於「條款範本管理」設定預設付款條件；有效期限由上方日期欄位獨立控制。</div></div>
           <div class="field" style="margin-bottom:0;">
+            <div class="grid2" style="margin-bottom:12px">
+              <div class="field"><label>付款方式（可選擇或自訂）</label><select id="f_payment_preset" onchange="applyQuoteTermSelections()">
+                <option value="">不指定／維持原條款</option>
+                <option value="驗收後 30 天內匯款">驗收後 30 天內匯款</option>
+                <option value="驗收後 15 天內匯款">驗收後 15 天內匯款</option>
+                <option value="訂單確認後 7 天內匯款">訂單確認後 7 天內匯款</option>
+                <option value="二期付款（50%、50%）">二期付款（50%、50%）</option>
+                <option value="custom">自訂付款方式</option>
+              </select><input id="f_payment_custom" placeholder="輸入自訂付款方式" style="display:none;margin-top:7px" oninput="applyQuoteTermSelections()"></div>
+              <div class="field"><label>未列項目費用</label><select id="f_extra_fee_preset" onchange="applyQuoteTermSelections()">
+                <option value="">不加入此條款</option>
+                <option value="本報價不含未列項目之額外費用。">本報價不含未列項目之額外費用。</option>
+                <option value="未列項目之費用另行報價。">未列項目之費用另行報價。</option>
+                <option value="custom">自訂條款</option>
+              </select><input id="f_extra_fee_custom" placeholder="輸入自訂費用條款" style="display:none;margin-top:7px" oninput="applyQuoteTermSelections()"></div>
+            </div>
+            <label style="display:block;margin-bottom:7px">付款條件與其他條款（可直接修改）</label>
             <textarea id="f_notes" rows="5"></textarea>
+            <label style="display:block;margin:12px 0 7px">其他備註（選填）</label>
+            <textarea id="f_extra_notes" rows="3" placeholder="例如：交付方式、特殊約定、客戶注意事項；不需要可留白"></textarea>
           </div>
           <div class="grid2" style="margin-top:14px;">
             <div class="field" style="margin-bottom:0;">
@@ -2006,6 +2025,41 @@ async function loadNoteTemplates(){
  noteTemplates.filter(t=>t.is_active).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name+(t.is_default?'（預設）':'');el.appendChild(o);});
  renderNoteTemplates();
 }
+function applyQuoteTermSelections(){
+ const payment=document.getElementById('f_payment_preset').value;
+ const extra=document.getElementById('f_extra_fee_preset').value;
+ document.getElementById('f_payment_custom').style.display=payment==='custom'?'block':'none';
+ document.getElementById('f_extra_fee_custom').style.display=extra==='custom'?'block':'none';
+ const p=payment==='custom'?document.getElementById('f_payment_custom').value.trim():payment;
+ const e=extra==='custom'?document.getElementById('f_extra_fee_custom').value.trim():extra;
+ const notes=document.getElementById('f_notes');
+ const existing=notes.value.split('\n').filter(line=>!/^付款方式：|^本報價不含未列項目之額外費用。$|^未列項目之費用另行報價。$/.test(line.trim()));
+ if(p)existing.push('付款方式：'+p);
+ if(e)existing.push(e);
+ notes.value=existing.join('\n').trim();
+}
+function splitQuoteNotes(value){
+ const text=String(value||'');
+ const index=text.indexOf('\n備註：\n');
+ if(index<0)return {terms:text,extra:''};
+ return {terms:text.slice(0,index),extra:text.slice(index+5)};
+}
+function loadQuoteNotes(value){
+ const parts=splitQuoteNotes(value);
+ document.getElementById('f_notes').value=parts.terms;
+ document.getElementById('f_extra_notes').value=parts.extra;
+ document.getElementById('f_payment_preset').value='';
+ document.getElementById('f_extra_fee_preset').value='';
+ document.getElementById('f_payment_custom').value='';
+ document.getElementById('f_extra_fee_custom').value='';
+ document.getElementById('f_payment_custom').style.display='none';
+ document.getElementById('f_extra_fee_custom').style.display='none';
+}
+function combinedQuoteNotes(){
+ const terms=document.getElementById('f_notes').value.trim();
+ const extra=document.getElementById('f_extra_notes').value.trim();
+ return terms+(extra?(terms?'\n備註：\n':'備註：\n')+extra:'');
+}
 function applyNoteTemplate(id){
  const t=noteTemplates.find(t=>t.id===id);if(!t)return;
  const el=document.getElementById('f_notes');
@@ -2125,7 +2179,7 @@ async function openV21Library(kind){
     editorItems.push(...rows);
    }else{
     editorItems=rows;
-    document.getElementById('f_notes').value=item.notes||'';
+    loadQuoteNotes(item.notes||'');
     document.getElementById('f_tax_rate').value=item.tax_rate??5;
    }
    if(!editorItems.length)editorItems=[blankItemRow()];
@@ -2154,7 +2208,7 @@ async function saveV21Library(kind){
  if(!items.length){toast('請先加入至少一項服務',true);return;}
  const payload={name:name.trim(),items};
  if(kind==='template'){
-  payload.notes=document.getElementById('f_notes').value;
+  payload.notes=combinedQuoteNotes();
   payload.tax_rate=Number(document.getElementById('f_tax_rate').value)||0;
  }
  const {data:existing,error:lookupError}=await sb.from(table).select('id').eq('name',payload.name).maybeSingle();
@@ -2200,7 +2254,7 @@ function resetEditor(){
   document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
   document.getElementById('f_discount_type').value = 'none';
   document.getElementById('f_discount_value').value = 0;
-  document.getElementById('f_notes').value = ''; // 條款由後台預設範本決定，不硬編碼付款條件。
+  loadQuoteNotes(''); // 條款由後台範本或個別選項決定。
   document.getElementById('f_status').value = 'draft';
   applyDefaultNoteTemplate();
   editorItems = [blankItemRow()];
@@ -2319,7 +2373,7 @@ async function useLastClientQuote(){
  const {data:items,error:itemError}=await sb.from('quotation_items').select('*').eq('quotation_id',previous.id).order('sort_order');
  if(itemError){toast('讀取明細失敗：'+itemError.message,true);return;}
  editorItems=(items||[]).length?items.map(it=>blankItemRow(it)):[blankItemRow()];
- document.getElementById('f_notes').value=previous.notes||'';
+ loadQuoteNotes(previous.notes||'');
  document.getElementById('f_tax_rate').value=previous.tax_rate??5;
  document.getElementById('f_discount_type').value=previous.discount_type||'none';
  document.getElementById('f_discount_value').value=previous.discount_value||0;
@@ -2346,7 +2400,7 @@ function collectFormData(){
     phone: document.getElementById('f_phone').value.trim(),
     address: document.getElementById('f_address').value.trim(),
     email: document.getElementById('f_email').value.trim(),
-    notes: document.getElementById('f_notes').value,
+    notes: combinedQuoteNotes(),
     tax_rate: taxRate,
     subtotal, tax_amount: tax, total, discount_type: discountType, discount_value: discountValue, discount_amount: discount,
     status: document.getElementById('f_status').value,
@@ -2511,7 +2565,7 @@ async function openQuotation(id){
   document.getElementById('f_tax_rate').value = quote.tax_rate ?? 5;
   document.getElementById('f_discount_type').value = quote.discount_type || 'none';
   document.getElementById('f_discount_value').value = quote.discount_value || 0;
-  document.getElementById('f_notes').value = quote.notes || '';
+  loadQuoteNotes(quote.notes || '');
    document.getElementById('f_note_template').value = '';
   document.getElementById('f_status').value = quote.status || 'draft';
 
