@@ -2364,6 +2364,7 @@ async function saveQuotation(){
   data.locked = willLock;
 
   const btn = document.getElementById('saveBtn');
+  if(btn.disabled)return;
   btn.disabled = true; btn.textContent = '儲存中...';
 
   try{
@@ -2379,9 +2380,11 @@ async function saveQuotation(){
       quoteId = inserted.id;
       currentQuote = inserted;
     }else{
-      const { error: updErr } = await sb.from('quotations').update(data).eq('id', quoteId);
+      const { data:updated, error: updErr } = await sb.from('quotations').update(data).eq('id', quoteId).select('id');
       if(updErr) throw updErr;
-      await sb.from('quotation_items').delete().eq('quotation_id', quoteId);
+      if(!updated?.length) throw new Error('報價單未更新，可能已被其他使用者修改或權限不足');
+      const {error:deleteItemsError}=await sb.from('quotation_items').delete().eq('quotation_id',quoteId);
+      if(deleteItemsError)throw deleteItemsError;
     }
 
     const itemRows = editorItems.filter(r=>r.item_name.trim()).map((r,i)=>({
@@ -2415,7 +2418,7 @@ async function saveQuotation(){
   }catch(e){
     toast('儲存失敗：' + e.message, true);
   }finally{
-    btn.disabled = false; btn.textContent = '儲存報價單';
+    btn.disabled = !!currentQuote?.locked; btn.textContent = '儲存報價單';
   }
 }
 
