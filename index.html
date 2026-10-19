@@ -2095,6 +2095,8 @@ function resetEditor(){
   document.getElementById('f_address').value = '';
   document.getElementById('f_email').value = '';
   document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
+  document.getElementById('f_discount_type').value = 'none';
+  document.getElementById('f_discount_value').value = 0;
   document.getElementById('f_notes').value = '報價單有效期限為 30 天。\n付款方式：驗收後 30 天內匯款。\n本報價不含未列項目之額外費用。';
   document.getElementById('f_status').value = 'draft';
   applyDefaultNoteTemplate();
@@ -2164,7 +2166,7 @@ function recalcTotals(){
 
 function setLocked(locked){
   document.getElementById('lockedBanner').style.display = locked ? 'flex' : 'none';
-  const fieldIds = ['f_issue_date','f_valid_until','f_sales_rep','f_client_name','f_contact_person','f_tax_id','f_phone','f_address','f_email','f_tax_rate','f_notes'];
+  const fieldIds = ['f_issue_date','f_valid_until','f_sales_rep','f_client_name','f_contact_person','f_tax_id','f_phone','f_address','f_email','f_tax_rate','f_discount_type','f_discount_value','f_notes','f_status'];
   fieldIds.forEach(id=> {
     const el = document.getElementById(id);
     if(el) el.disabled = locked;
@@ -2172,15 +2174,18 @@ function setLocked(locked){
   document.querySelectorAll('#itemsBody input, #itemsBody select').forEach(el=> el.disabled = locked);
   document.getElementById('f_note_template').disabled = locked;
   document.getElementById('saveBtn').disabled = locked;
+  document.querySelectorAll('#panel-editor button[onclick^="setValidityDays"], #panel-editor button[onclick^="useLastClientQuote"], #panel-editor button[onclick^="addItemRow"], #panel-editor button[onclick^="openCatalogPicker"], #itemsBody button.row-remove').forEach(el=>el.disabled=locked);
 }
 
 /* ================= V2.1 快速輸入與檢核 ================= */
 function setValidityDays(days){
+ if(document.getElementById('f_valid_until').disabled)return;
  const date=document.getElementById('f_issue_date').value||todayStr();
  const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+days);
  document.getElementById('f_valid_until').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function suggestClients(query){
+ if(document.getElementById('f_client_name').disabled)return;
  const box=document.getElementById('clientSuggestions');
  const q=(query||'').trim().toLowerCase();
  const matches=q?clients.filter(c=>[c.company_name,c.tax_id,c.contact_person].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,8):[];
@@ -2205,6 +2210,7 @@ async function useLastClientQuote(){
  if(error){toast('查詢歷史報價失敗：'+error.message,true);return;}
  const previous=(data||[]).find(q=>q.id!==currentQuote?.id);
  if(!previous){toast('找不到可帶入的歷史報價',true);return;}
+ if(currentQuote?.locked || (currentQuote && !['admin','manager'].includes(currentProfile?.role) && currentQuote.user_id!==currentUser.id)){toast('目前報價單為唯讀，無法帶入歷史資料',true);return;}
  if(!confirm('帶入 '+previous.quote_no+' 的服務明細及條款？目前明細將被取代。'))return;
  const {data:items,error:itemError}=await sb.from('quotation_items').select('*').eq('quotation_id',previous.id).order('sort_order');
  if(itemError){toast('讀取明細失敗：'+itemError.message,true);return;}
@@ -2454,6 +2460,7 @@ async function unlockQuote(){
     toast('權限不足：只有管理員或經理可以解鎖', true);
     return;
   }
+  if(!currentQuote.locked){toast('此報價單目前未鎖定');return;}
   if(!confirm('確定要解鎖這張報價單嗎？解鎖後可再次編輯。')) return;
   const { error } = await sb.from('quotations').update({ locked:false }).eq('id', currentQuote.id);
   if(error){ toast('解鎖失敗：' + error.message, true); return; }
