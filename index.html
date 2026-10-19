@@ -2561,10 +2561,8 @@ async function downloadQuotationPdf(){
  const name=document.getElementById('f_client_name').value.trim()||'未命名客戶';
  const no=currentQuote?.quote_no||'草稿';
  const clean=x=>String(x).replace(/[\\/:*?"<>|\\x00-\\x1f]/g,'_').slice(0,70);
- // Build the print markup first; printing is temporarily suppressed for this render.
- const originalPrint=window.print;
- window.print=()=>{};
- try{printQuotation();}finally{window.print=originalPrint;}
+ // Render without triggering any print dialog, including asynchronous image callbacks.
+ renderQuotationPrintArea();
  const original=document.getElementById('printArea');
  const wrapper=document.createElement('div');
  wrapper.style.cssText='position:fixed;left:-20000px;top:0;width:794px;background:white;z-index:-1;';
@@ -2586,7 +2584,7 @@ async function downloadQuotationPdf(){
  finally{wrapper.remove();}
 }
 /* ================= 列印 / PDF ================= */
-function printQuotation(){
+function renderQuotationPrintArea(){
   const data = collectFormData();
   document.getElementById('p_company_name').textContent = companySettings.company_name || '';
   document.getElementById('p_company_en').textContent=pdfSettings.company_name_en||'';
@@ -2633,9 +2631,14 @@ function printQuotation(){
   document.getElementById('p_total').textContent = money(data.total);
   document.getElementById('p_notes').textContent = data.notes || '';
 
-  const logo=document.getElementById('p_logo');
-  if(logo.complete)window.print();
-  else {logo.addEventListener('load',()=>window.print(),{once:true});logo.addEventListener('error',()=>window.print(),{once:true});}
+
+}
+
+function printQuotation(){
+ renderQuotationPrintArea();
+ const logo=document.getElementById('p_logo');
+ if(logo.complete)window.print();
+ else {logo.addEventListener('load',()=>window.print(),{once:true});logo.addEventListener('error',()=>window.print(),{once:true});}
 }
 
 /* ================= 小工具 ================= */
