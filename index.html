@@ -256,7 +256,24 @@
   .toast.show{opacity:1;transform:translateY(0);}
   .toast.err{background:var(--rejected);}
 
+  #printArea{display:none;}
   @media print{
+    @page{size:A4 portrait;margin:12mm 14mm;}
+    #printArea{box-sizing:border-box;}
+    #printArea .p-sign{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:18px;border:1px solid #b7c7c5;break-inside:avoid;page-break-inside:avoid;}
+    #printArea .p-sign-cell{box-sizing:border-box;min-width:0;min-height:105px;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;overflow-wrap:anywhere;}
+    #printArea .p-sign-cell+.p-sign-cell{border-left:1px solid #b7c7c5;}
+    #printArea .p-sign-heading{text-align:center;font-size:12px;font-weight:700;padding-bottom:6px;border-bottom:1px solid #dce5e3;}
+    #printArea .p-sign-statement{font-size:10px;line-height:1.5;margin-top:8px;}
+    #printArea .p-sign-bottom{font-size:11px;line-height:1.8;margin-top:auto;}
+    #printArea .p-sign-bottom>div{margin-top:4px;}
+    #printArea .p-head img{object-fit:contain;}
+    #printArea .p-head .p-logo-wrap{min-width:0;flex:1;}
+    #printArea .p-head .qmeta{flex:0 0 36%;min-width:0;}
+    #printArea thead{display:table-header-group;}
+    #printArea tr{break-inside:avoid;page-break-inside:avoid;}
+    #printArea .p-totals{break-inside:avoid;page-break-inside:avoid;}
+
     html, body{overflow:visible !important;height:auto !important;}
     body *{visibility:hidden;}
     #printArea, #printArea *{visibility:visible;}
@@ -605,6 +622,7 @@
         <div class="settings-tabs">
           <button class="tab-btn active" onclick="switchSettingsTab('tab-profile')">👤 個人業務資料</button>
           <button class="tab-btn" onclick="switchSettingsTab('tab-company')">🏢 公司資訊</button>
+          <button class="tab-btn" onclick="switchSettingsTab('tab-pdf')">報價單版型</button>
           <button class="tab-btn" id="tab-btn-users" onclick="switchSettingsTab('tab-users')" style="display:none;">👥 成員帳號管理</button>
           <button class="tab-btn" id="tab-btn-conn" onclick="switchSettingsTab('tab-conn')" style="display:none;">🔌 連線設定</button>
         </div>
@@ -639,6 +657,32 @@
           </div>
         </div>
 
+        <!-- PDF layout settings (admin write; all signed-in users read) -->
+        <div class="settings-subpanel" id="tab-pdf">
+          <div class="card">
+            <h2>報價單 PDF 版型設定</h2>
+            <div id="pdfSettingsHint" class="hint" style="margin-bottom:14px;">公司名稱沿用「公司資訊」設定；此處可自訂其他 PDF 標題與簽章文字。</div>
+            <div class="grid2">
+              <div class="field"><label>公司英文名稱（留空不顯示）</label><input id="pdf_company_name_en"></div>
+              <div class="field"><label>中文文件標題</label><input id="pdf_document_title"></div>
+              <div class="field"><label>英文文件標題（留空不顯示）</label><input id="pdf_document_title_en"></div>
+              <div class="field"><label>品牌主色</label><input id="pdf_brand_color" type="color" value="#0f625e" style="height:40px"></div>
+              <div class="field"><label>客戶確認欄標題</label><input id="pdf_client_sign_title"></div>
+              <div class="field"><label>報價確認欄標題</label><input id="pdf_quote_sign_title"></div>
+              <div class="field"><label>客戶簽章文字</label><input id="pdf_client_sign_label"></div>
+              <div class="field"><label>報價方簽章文字</label><input id="pdf_quote_sign_label"></div>
+              <div class="field"><label>主管簽核文字</label><input id="pdf_approval_label"></div>
+              <div class="field"><label>LOGO 大小</label><select id="pdf_logo_size"><option value="small">小</option><option value="medium">中</option><option value="large">大</option></select></div>
+              <div class="field" style="grid-column:1/-1;"><label>客戶簽回聲明</label><textarea id="pdf_client_confirm_text" rows="2"></textarea></div>
+              <div class="field" style="grid-column:1/-1;">
+                <label>公司 LOGO（PNG / JPG / WebP，最多 2MB）</label>
+                <input id="pdf_logo_upload" type="file" accept="image/png,image/jpeg,image/webp">
+                <div style="margin-top:8px;display:flex;gap:12px;align-items:center"><img id="pdf_logo_preview" alt="LOGO 預覽" style="max-width:90px;max-height:65px;object-fit:contain;display:none"><span id="pdf_logo_status" class="hint"></span></div>
+              </div>
+            </div>
+            <button id="pdfSaveBtn" class="btn btn-primary btn-sm" onclick="savePdfSettings()">儲存 PDF 版型設定</button>
+          </div>
+        </div>
         <!-- 子項目 3：成員帳號管理（僅管理員顯示） -->
         <div class="settings-subpanel" id="tab-users">
           <div class="card">
@@ -832,16 +876,16 @@
 
 <!-- 列印用內容 -->
 <div id="printArea">
-  <div class="p-head">
+  <div class="p-head" id="pdfHeader">
     <div class="p-logo-wrap">
-      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" alt="USIS Logo">
+      <img id="p_logo" src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" alt="公司 LOGO">
       <div>
-        <h1 id="p_company_name">優士國際資安股份有限公司</h1>
+        <h1 id="p_company_name">優士國際資安股份有限公司</h1><div class="co" id="p_company_en"></div>
         <div class="co" id="p_company_meta"></div>
       </div>
     </div>
     <div class="qmeta">
-      <div>報 價 單</div>
+      <div id="p_doc_title">報 價 單</div><div id="p_doc_title_en"></div>
       <div class="no" id="p_quote_no"></div>
       <div id="p_dates"></div>
     </div>
@@ -858,8 +902,15 @@
   </table>
   <div class="p-notes" id="p_notes"></div>
   <div class="p-sign">
-    <div class="line">客戶簽章</div>
-    <div class="line">USIS 業務簽章</div>
+    <div class="p-sign-cell">
+      <div class="p-sign-heading" id="p_client_sign_title"></div>
+      <div class="p-sign-statement" id="p_client_confirm_text"></div>
+      <div class="p-sign-bottom" id="p_client_sign_label"></div>
+    </div>
+    <div class="p-sign-cell">
+      <div class="p-sign-heading" id="p_quote_sign_title"></div>
+      <div class="p-sign-bottom"><div id="p_quote_sign_label"></div><div id="p_approval_label"></div></div>
+    </div>
   </div>
 </div>
 
@@ -891,6 +942,13 @@ let sb = null;
 let currentUser = null;
 let currentProfile = null;
 let companySettings = { company_name:'優士國際資安股份有限公司', address:'', phone:'', tax_id:'', bank_info:'', default_tax_rate:5, quote_prefix:'QT' };
+let pdfSettings = {
+ company_name_en:'USIS INTERNATIONAL INFORMATION SECURITY', document_title:'報 價 單',document_title_en:'QUOTATION',
+ client_sign_title:'客戶訂購確認欄',quote_sign_title:'報價確認欄',
+ client_sign_label:'承辦人簽章：',quote_sign_label:'承辦人簽章：',approval_label:'主管簽核：',
+ client_confirm_text:'客戶確認後請加蓋公司章簽回，簽回後即視同正式訂購單。',
+ brand_color:'#0F625E',logo_size:'medium',logo_path:null
+};
 let catalog = [];
 let noteTemplates = [];
 let quotations = [];
@@ -1070,6 +1128,7 @@ async function afterLogin(){
     applySettingsPermissions();
 
     await loadCompanySettings();
+    await loadPdfSettings();
     await loadCatalog();
     await loadNoteTemplates();
     await loadQuotations();
@@ -1092,6 +1151,9 @@ function applySettingsPermissions(){
     const el = document.getElementById(id);
     if(el) el.disabled = !isAdmin;
   });
+  document.querySelectorAll('#tab-pdf input,#tab-pdf select,#tab-pdf textarea').forEach(el=>el.disabled=!isAdmin);
+  document.getElementById('pdfSaveBtn').style.display=isAdmin?'inline-flex':'none';
+  document.getElementById('pdfSettingsHint').textContent=isAdmin?'可修改 PDF 的企業識別、標題與簽章文字。':'僅管理員可以修改 PDF 版型設定。';
   const saveBtn = document.getElementById('settingsSaveBtn');
   if(saveBtn) saveBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
@@ -1612,6 +1674,46 @@ async function saveCompanySettings(){
   }
 }
 
+/* ================= PDF settings ================= */
+const PDF_FIELDS=['company_name_en','document_title','document_title_en','client_sign_title','quote_sign_title','client_sign_label','quote_sign_label','approval_label','client_confirm_text','brand_color','logo_size'];
+function pdfLogoUrl(){
+ if(!pdfSettings.logo_path)return 'https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png';
+ return sb.storage.from('usis-pdf-assets').getPublicUrl(pdfSettings.logo_path).data.publicUrl+'?v='+encodeURIComponent(pdfSettings.updated_at||'1');
+}
+function fillPdfSettingsForm(){
+ PDF_FIELDS.forEach(k=>{const el=document.getElementById('pdf_'+k);if(el)el.value=pdfSettings[k]??'';});
+ const img=document.getElementById('pdf_logo_preview');img.src=pdfLogoUrl();img.style.display='block';
+}
+async function loadPdfSettings(){
+ const {data,error}=await sb.from('pdf_settings').select('*').eq('id',1).maybeSingle();
+ if(error){console.warn('PDF settings unavailable until migration is applied:',error.message);return;}
+ if(data)pdfSettings={...pdfSettings,...data};
+ fillPdfSettingsForm();
+}
+async function savePdfSettings(){
+ if(currentProfile?.role!=='admin'){toast('僅管理員可修改 PDF 版型',true);return;}
+ const btn=document.getElementById('pdfSaveBtn');btn.disabled=true;
+ try{
+  const payload={id:1};
+  PDF_FIELDS.forEach(k=>payload[k]=document.getElementById('pdf_'+k).value.trim());
+  if(!/^#[0-9a-fA-F]{6}$/.test(payload.brand_color))throw Error('品牌色格式不正確');
+  const file=document.getElementById('pdf_logo_upload').files[0];
+  if(file){
+   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2097152)throw Error('LOGO 必須是 PNG/JPG/WebP 且不超過 2MB');
+   const ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[file.type];
+   const path='pdf/company-logo-'+Date.now()+'.'+ext;
+   const {error:uploadErr}=await sb.storage.from('usis-pdf-assets').upload(path,file,{contentType:file.type,upsert:false});
+   if(uploadErr)throw uploadErr;
+   payload.logo_path=path;
+  }
+  const {data,error}=await sb.from('pdf_settings').upsert(payload).select().single();
+  if(error)throw error;
+  pdfSettings={...pdfSettings,...data};fillPdfSettingsForm();
+  document.getElementById('pdf_logo_upload').value='';
+  toast('PDF 版型設定已儲存');
+ }catch(e){toast('PDF 設定儲存失敗：'+e.message,true);}
+ finally{btn.disabled=false;}
+}
 /* ================= 服務目錄（管理員 / 業務經理） ================= */
 async function loadCatalog(){
   try{
@@ -2258,6 +2360,20 @@ async function unlockQuote(){
 function printQuotation(){
   const data = collectFormData();
   document.getElementById('p_company_name').textContent = companySettings.company_name || '';
+  document.getElementById('p_company_en').textContent=pdfSettings.company_name_en||'';
+  document.getElementById('p_doc_title').textContent=pdfSettings.document_title||'報價單';
+  document.getElementById('p_doc_title_en').textContent=pdfSettings.document_title_en||'';
+  document.getElementById('p_client_sign_title').textContent=pdfSettings.client_sign_title||'';
+  document.getElementById('p_quote_sign_title').textContent=pdfSettings.quote_sign_title||'';
+  document.getElementById('p_client_sign_label').textContent=pdfSettings.client_sign_label||'';
+  document.getElementById('p_quote_sign_label').textContent=pdfSettings.quote_sign_label||'';
+  document.getElementById('p_approval_label').textContent=pdfSettings.approval_label||'';
+  document.getElementById('p_client_confirm_text').textContent=pdfSettings.client_confirm_text||'';
+  document.getElementById('p_logo').src=pdfLogoUrl();
+  const size={small:40,medium:56,large:72}[pdfSettings.logo_size]||56;
+  document.getElementById('p_logo').style.width=size+'px';
+  document.getElementById('p_logo').style.height=size+'px';
+  document.getElementById('printArea').style.setProperty('--brand',pdfSettings.brand_color||'#0F625E');
   const metaParts = [companySettings.address, companySettings.phone ? '電話：'+companySettings.phone : '', companySettings.tax_id ? '統編：'+companySettings.tax_id : ''].filter(Boolean);
   document.getElementById('p_company_meta').textContent = metaParts.join(' ');
   document.getElementById('p_quote_no').textContent = currentQuote ? currentQuote.quote_no : '（尚未儲存）';
