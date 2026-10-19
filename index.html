@@ -513,7 +513,7 @@
         <div class="card">
           <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" onclick="switchPanel('panel-templates')">管理付款條件／條款範本</button><span style="font-size:12px;color:#64736e">管理員／經理可設定預設條款</span></div><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><div style="margin-top:6px;font-size:12px;color:#64736e">管理員／經理可於「條款範本管理」設定預設付款條件；有效期限由上方日期欄位獨立控制。</div></div>
           <div class="field" style="margin-bottom:0;">
-            <div class="grid2"><div class="field"><label>有效期限（天）</label><input id="termDays" type="number" min="1" value="15" oninput="setValidityDays(Number(this.value));syncQuoteTermNotes()"></div><div class="field"><label>付款期數</label><select id="termCount" onchange="renderTermStages()"><option value="1">1期</option><option value="2" selected>2期</option><option value="3">3期</option><option value="4">4期</option><option value="5">5期</option><option value="6">6期</option></select></div></div>
+            <div class="grid2"><div class="field"><label>有效期限（天）</label><input id="termDays" type="number" min="1" value="15" oninput="setValidityDays(Number(this.value));syncQuoteTermNotes()"></div><div class="field"><label>付款期數</label><select id="termCount" onchange="redistributeTermStages()"><option value="1">1期</option><option value="2" selected>2期</option><option value="3">3期</option><option value="4">4期</option><option value="5">5期</option><option value="6">6期</option></select></div></div>
             <div id="termStageRows"></div><div id="termTotal" style="font-size:13px;margin:8px 0 16px"></div>
             <label style="display:block;margin-bottom:8px">其他條款（逐條編輯，可新增、刪除）</label>
             <div id="quoteTermRows" style="display:flex;flex-direction:column;gap:9px"></div>
@@ -2015,6 +2015,18 @@ async function loadNoteTemplates(){
 }
 let termStages=[{pct:50,detail:''},{pct:50,detail:''}];
 const termNames=['第一期','第二期','第三期','第四期','第五期','第六期'];
+function redistributeTermStages(){
+ const n=Number(document.getElementById('termCount').value);
+ if(!Number.isInteger(n)||n<1||n>6)return;
+ // Integer basis points guarantee a total of exactly 100.00%, including 3/6 stages.
+ const base=Math.floor(10000/n);
+ const leftover=10000-base*n;
+ termStages=Array.from({length:n},(_,i)=>({
+  pct:(base+(i===n-1?leftover:0))/100,
+  detail:termStages[i]?.detail||''
+ }));
+ renderTermStages();
+}
 function renderTermStages(){
  const n=Number(document.getElementById('termCount').value);
  termStages=Array.from({length:n},(_,i)=>termStages[i]||{pct:0,detail:''});
