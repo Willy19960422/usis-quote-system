@@ -2043,11 +2043,13 @@ function renderTermStages(){
  });syncQuoteTermNotes();updateInstallmentAmounts();
 }
 function installmentAmounts(total){
- const cents=Math.round((Number(total)||0)*100);
+ // Quotation totals are displayed in whole TWD. Allocate whole dollars, not cents,
+ // so displayed installments add up exactly to the displayed quotation total.
+ const dollars=Math.round(Number(total)||0);
  let allocated=0;
  return termStages.map((stage,i)=>{
-  const value=i===termStages.length-1?cents-allocated:Math.round(cents*(Number(stage.pct)||0)/100);
-  allocated+=value;return value/100;
+  const value=i===termStages.length-1?dollars-allocated:Math.round(dollars*(Number(stage.pct)||0)/100);
+  allocated+=value;return value;
  });
 }
 function updateInstallmentAmounts(total){
@@ -2082,6 +2084,10 @@ function parseTermStructure(text){
   if(m){const pct=m[2].match(/\d+(?:\.\d+)?(?=%)/g)||[];if(pct.length===Number(m[1])&&pct.length<=6)stages=pct.map(x=>({pct:Number(x),detail:''}));continue;}
   const i=termNames.findIndex(x=>line.startsWith(x+'：'));
   if(i>=0){details[i]=line.slice(termNames[i].length+1).replace(/（應付金額：.*?）$/,'');continue;}
+  // Legacy generic terms from the old template duplicate the structured installment section.
+  // Keep user-authored extra clauses, but drop the two obsolete default lines.
+  if(/^付款方式\s*[:：]\s*驗收後\s*30\s*天內匯款\s*[。.]?$/.test(line))continue;
+  if(/^本報價不含未列項目之額外費用[。.]?$/.test(line))continue;
   rest.push(line);
  }
  if(stages){termStages=stages;document.getElementById('termCount').value=String(stages.length);}
