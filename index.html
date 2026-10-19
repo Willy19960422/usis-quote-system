@@ -459,7 +459,7 @@
           <h2><span class="editor-heading-label"><span class="editor-step">01</span>報價單資訊 <span class="n" id="quoteNoDisplay" style="margin-left:10px">自動產生</span></span></h2>
           <div class="grid3">
             <div class="field"><label>開立日期</label><input type="date" id="f_issue_date"></div>
-            <div class="field"><label>有效期限</label><input type="date" id="f_valid_until"></div>
+            <div class="field"><label>有效期限</label><input type="date" id="f_valid_until"><div style="display:flex;gap:5px;margin-top:6px"><button type="button" class="btn btn-line btn-sm" onclick="setValidityDays(15)">15 天</button><button type="button" class="btn btn-line btn-sm" onclick="setValidityDays(30)">30 天</button><button type="button" class="btn btn-line btn-sm" onclick="setValidityDays(60)">60 天</button></div></div>
             <div class="field"><label>業務負責人（自動帶入）</label><input type="text" id="f_sales_rep" placeholder="填寫業務姓名"></div>
           </div>
         </div>
@@ -470,7 +470,7 @@
             <button class="btn btn-line btn-sm" onclick="openClientPicker()">+ 從既有客戶帶入</button>
           </h2>
           <div class="grid2">
-            <div class="field"><label>客戶公司名稱 *</label><input type="text" id="f_client_name" placeholder="請輸入客戶公司全銜"></div>
+            <div class="field" style="position:relative"><label>客戶公司名稱 *</label><input type="text" id="f_client_name" placeholder="輸入名稱搜尋既有客戶" autocomplete="off" oninput="suggestClients(this.value)" onfocus="suggestClients(this.value)"><div id="clientSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:40;background:white;border:1px solid #dce6e3;border-radius:8px;max-height:220px;overflow:auto;box-shadow:0 10px 24px #0002"></div><button type="button" class="btn btn-line btn-sm" style="margin-top:6px" onclick="useLastClientQuote()">帶入此客戶上次報價</button></div>
             <div class="field"><label>聯絡人</label><input type="text" id="f_contact_person"></div>
             <div class="field"><label>統一編號</label><input type="text" id="f_tax_id"></div>
             <div class="field"><label>電話</label><input type="text" id="f_phone"></div>
@@ -504,7 +504,7 @@
 
           <div class="totals">
             <table>
-              <tr><td class="label">小計</td><td class="amount num" id="t_subtotal">$0</td></tr>
+              <tr><td class="label">小計</td><td class="amount num" id="t_subtotal">$0</td></tr><tr><td class="label">折扣 <select id="f_discount_type" onchange="recalcTotals()" style="max-width:115px"><option value="none">無折扣</option><option value="percent">百分比 (%)</option><option value="fixed">固定金額</option></select> <input id="f_discount_value" type="number" min="0" value="0" style="width:88px" oninput="recalcTotals()"></td><td class="amount num" id="t_discount">$0</td></tr>
               <tr>
                 <td class="label">稅額（<input type="number" id="f_tax_rate" value="5" style="width:46px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;" onchange="recalcTotals()">%）</td>
                 <td class="amount num" id="t_tax">$0</td>
@@ -1700,6 +1700,8 @@ async function loadCompanySettings(){
   document.getElementById('s_prefix').value = companySettings.quote_prefix||'QT';
   document.getElementById('s_bank').value = companySettings.bank_info||'';
   document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
+  document.getElementById('f_discount_type').value = 'none';
+  document.getElementById('f_discount_value').value = 0;
 }
 
 async function saveCompanySettings(){
@@ -2155,13 +2157,17 @@ function removeItemRow(rowId){
 function recalcTotals(){
   const subtotal = editorItems.reduce((s,r)=> s + (r.is_gift ? 0 : r.quantity*r.unit_price), 0);
   const taxRate = Number(document.getElementById('f_tax_rate').value)||0;
-  const tax = Math.round(subtotal * taxRate / 100);
-  const total = subtotal + tax;
+  const discountType = document.getElementById('f_discount_type').value;
+  const discountValue = Math.max(0, Number(document.getElementById('f_discount_value').value)||0);
+  const discount = Math.min(subtotal, discountType==='percent' ? Math.round(subtotal*Math.min(100,discountValue)/100) : discountType==='fixed' ? discountValue : 0);
+  const tax = Math.round((subtotal-discount) * taxRate / 100);
+  const total = subtotal - discount + tax;
+  document.getElementById('t_discount').textContent = discount ? '-' + money(discount) : money(0);
   document.getElementById('t_subtotal').textContent = money(subtotal);
   document.getElementById('t_tax').textContent = money(tax);
   document.getElementById('t_total').textContent = money(total);
   document.getElementById('editorHeroTotal').textContent = money(total);
-  return { subtotal, tax, total, taxRate };
+  return { subtotal, discount, discountType, discountValue, tax, total, taxRate };
 }
 
 function setLocked(locked){
@@ -2176,9 +2182,58 @@ function setLocked(locked){
   document.getElementById('saveBtn').disabled = locked;
 }
 
+/* ================= V2.1 快速輸入與檢核 ================= */
+function setValidityDays(days){
+ const date=document.getElementById('f_issue_date').value||todayStr();
+ const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+days);
+ document.getElementById('f_valid_until').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function suggestClients(query){
+ const box=document.getElementById('clientSuggestions');
+ const q=(query||'').trim().toLowerCase();
+ const matches=q?clients.filter(c=>[c.company_name,c.tax_id,c.contact_person].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,8):[];
+ box.replaceChildren();
+ matches.forEach(c=>{
+  const btn=document.createElement('button');btn.type='button';
+  btn.style.cssText='display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #edf1f0;background:white;padding:10px 12px;cursor:pointer';
+  btn.textContent=c.company_name+(c.tax_id?' · '+c.tax_id:'');
+  btn.onclick=()=>{
+   const mapping={f_client_name:'company_name',f_contact_person:'contact_person',f_tax_id:'tax_id',f_phone:'phone',f_address:'address',f_email:'email'};
+   Object.entries(mapping).forEach(([id,key])=>document.getElementById(id).value=c[key]||'');
+   box.style.display='none';
+  };
+  box.appendChild(btn);
+ });
+ box.style.display=matches.length?'block':'none';
+}
+async function useLastClientQuote(){
+ const name=document.getElementById('f_client_name').value.trim();
+ if(!name){toast('請先選擇客戶',true);return;}
+ const {data,error}=await sb.from('quotations').select('*').eq('client_name',name).order('issue_date',{ascending:false}).limit(10);
+ if(error){toast('查詢歷史報價失敗：'+error.message,true);return;}
+ const previous=(data||[]).find(q=>q.id!==currentQuote?.id);
+ if(!previous){toast('找不到可帶入的歷史報價',true);return;}
+ if(!confirm('帶入 '+previous.quote_no+' 的服務明細及條款？目前明細將被取代。'))return;
+ const {data:items,error:itemError}=await sb.from('quotation_items').select('*').eq('quotation_id',previous.id).order('sort_order');
+ if(itemError){toast('讀取明細失敗：'+itemError.message,true);return;}
+ editorItems=(items||[]).length?items.map(it=>blankItemRow(it)):[blankItemRow()];
+ document.getElementById('f_notes').value=previous.notes||'';
+ document.getElementById('f_tax_rate').value=previous.tax_rate??5;
+ document.getElementById('f_discount_type').value=previous.discount_type||'none';
+ document.getElementById('f_discount_value').value=previous.discount_value||0;
+ renderItems();recalcTotals();toast('已帶入上次報價明細，尚未儲存');
+}
+function validateQuoteEditor(data){
+ if(data.valid_until&&data.issue_date&&data.valid_until<data.issue_date){toast('有效期限不可早於開立日期',true);return false;}
+ if(editorItems.some(r=>r.item_name.trim()&&(Number(r.quantity)<=0||Number(r.unit_price)<0))){toast('服務數量須大於零，單價不可為負數',true);return false;}
+ if(data.tax_rate<0||data.tax_rate>100){toast('稅率必須介於 0 至 100',true);return false;}
+ const v=Number(document.getElementById('f_discount_value').value)||0;
+ if(v<0||(data.discount_type==='percent'&&v>100)){toast('折扣百分比不可超過 100%，也不可為負數',true);return false;}
+ return true;
+}
 /* ================= 儲存 / 讀取 / 刪除 報價單（綁定擁有者驗證） ================= */
 function collectFormData(){
-  const { subtotal, tax, total, taxRate } = recalcTotals();
+  const { subtotal, discount, discountType, discountValue, tax, total, taxRate } = recalcTotals();
   return {
     issue_date: document.getElementById('f_issue_date').value || todayStr(),
     valid_until: document.getElementById('f_valid_until').value || null,
@@ -2191,7 +2246,7 @@ function collectFormData(){
     email: document.getElementById('f_email').value.trim(),
     notes: document.getElementById('f_notes').value,
     tax_rate: taxRate,
-    subtotal, tax_amount: tax, total,
+    subtotal, tax_amount: tax, total, discount_type: discountType, discount_value: discountValue, discount_amount: discount,
     status: document.getElementById('f_status').value,
     user_id: currentUser.id
   };
@@ -2201,6 +2256,7 @@ async function saveQuotation(){
   const data = collectFormData();
   if(!data.client_name){ toast('請輸入客戶公司名稱', true); return; }
   if(editorItems.every(r=>!r.item_name.trim())){ toast('請至少輸入一項服務項目', true); return; }
+  if(!validateQuoteEditor(data)) return;
 
   // 業務人員權限判定：若已是既有單且不是自己開的，禁止修改
   if(currentQuote && currentQuote.user_id && currentQuote.user_id !== currentUser.id){
@@ -2339,6 +2395,8 @@ async function openQuotation(id){
   document.getElementById('f_address').value = quote.address || '';
   document.getElementById('f_email').value = quote.email || '';
   document.getElementById('f_tax_rate').value = quote.tax_rate ?? 5;
+  document.getElementById('f_discount_type').value = quote.discount_type || 'none';
+  document.getElementById('f_discount_value').value = quote.discount_value || 0;
   document.getElementById('f_notes').value = quote.notes || '';
    document.getElementById('f_note_template').value = '';
   document.getElementById('f_status').value = quote.status || 'draft';
