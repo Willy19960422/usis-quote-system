@@ -531,7 +531,7 @@
         <div class="panel-actions">
           <button class="btn btn-primary" id="saveBtn" onclick="saveQuotation()">儲存報價單</button>
           <button class="btn btn-line" onclick="saveAsNew()">另存新報價單</button>
-          <button class="btn btn-primary" onclick="downloadQuotationPdf()">下載 PDF</button>
+          <button class="btn btn-primary" onclick="downloadQuotationPdf()">預覽 PDF</button>
           <button class="btn btn-line" onclick="printQuotation()">列印／另存 PDF</button>
           <button class="btn btn-line" onclick="resetEditor()">清空重新填寫</button>
           <button class="btn btn-danger" id="deleteBtn" onclick="deleteQuotation()" style="display:none;">刪除</button>
@@ -964,6 +964,18 @@
   </div>
 </div>
 
+<div id="pdfPreviewModal" role="dialog" aria-modal="true" aria-label="報價單 PDF 預覽" style="display:none;position:fixed;inset:0;background:#10252dcc;z-index:10010;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;color:#233;border-radius:12px;width:min(980px,100%);height:min(92vh,1050px);display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #dce5e3">
+      <strong>報價單 PDF 預覽</strong>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" id="pdfConfirmDownload" onclick="confirmPdfDownload()">確認下載</button>
+        <button class="btn btn-line btn-sm" onclick="closePdfPreview()">關閉</button>
+      </div>
+    </div>
+    <iframe id="pdfPreviewFrame" title="報價單 PDF 預覽" style="width:100%;flex:1;border:0;background:#f2f4f5"></iframe>
+  </div>
+</div>
 <div id="v21LibraryModal" role="dialog" aria-modal="true" aria-label="套餐與報價範本管理" style="display:none;position:fixed;inset:0;background:#0c222b99;z-index:9999;align-items:center;justify-content:center;padding:18px">
   <div style="background:#fff;color:#233;border-radius:12px;padding:24px;width:min(700px,100%);max-height:85vh;overflow:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 id="v21LibraryTitle" style="margin:0">管理</h2><button class="btn btn-line btn-sm" onclick="closeV21Library()">關閉</button></div>
@@ -2565,7 +2577,25 @@ async function unlockQuote(){
 }
 
 /* ================= 下載正式 PDF ================= */
+let pdfPreviewUrl=null;
+let pdfPreviewName='';
+let pdfPreviewBusy=false;
+function closePdfPreview(){
+ document.getElementById('pdfPreviewModal').style.display='none';
+ document.getElementById('pdfPreviewFrame').removeAttribute('src');
+ if(pdfPreviewUrl){URL.revokeObjectURL(pdfPreviewUrl);pdfPreviewUrl=null;}
+ pdfPreviewName='';
+}
+function confirmPdfDownload(){
+ if(!pdfPreviewUrl)return toast('請先產生預覽',true);
+ const a=document.createElement('a');
+ a.href=pdfPreviewUrl;a.download=pdfPreviewName||'USIS_報價單.pdf';
+ document.body.appendChild(a);a.click();a.remove();
+ toast('已開始下載 PDF');
+}
 async function downloadQuotationPdf(){
+ if(pdfPreviewBusy)return;
+ pdfPreviewBusy=true;
  if(typeof html2pdf!=='function'){toast('PDF 產生元件尚未載入，請稍後重試或使用列印功能',true);return;}
  const name=document.getElementById('f_client_name').value.trim()||'未命名客戶';
  const no=currentQuote?.quote_no||'草稿';
@@ -2587,10 +2617,16 @@ async function downloadQuotationPdf(){
   await document.fonts.ready;
   const images=Array.from(clone.querySelectorAll('img'));
   await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));
-  await html2pdf().set({margin:0,filename:clean('USIS_報價單_'+no+'_'+name)+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(clone).save();
-  toast('PDF 已產生');
- }catch(e){console.error(e);toast('PDF 下載失敗：'+e.message+'，可改用列印／另存 PDF',true);}
- finally{wrapper.remove();}
+  const filename=clean('USIS_報價單_'+no+'_'+name)+'.pdf';
+  const blob=await html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(clone).outputPdf('blob');
+  closePdfPreview();
+  pdfPreviewUrl=URL.createObjectURL(blob);
+  pdfPreviewName=filename;
+  document.getElementById('pdfPreviewFrame').src=pdfPreviewUrl+'#toolbar=0';
+  document.getElementById('pdfPreviewModal').style.display='flex';
+  toast('預覽已產生，確認內容後再下載');
+ }catch(e){console.error(e);toast('PDF 預覽失敗：'+e.message+'，可改用列印／另存 PDF',true);}
+ finally{wrapper.remove();pdfPreviewBusy=false;}
 }
 /* ================= 列印 / PDF ================= */
 function renderQuotationPrintArea(){
