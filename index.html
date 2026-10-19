@@ -331,6 +331,7 @@
     #printArea .p-sign-cell{box-sizing:border-box;min-width:0;min-height:185px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;overflow-wrap:anywhere;}
     #printArea .p-sign-cell+.p-sign-cell{border-left:1px solid #b7c7c5;}
     #printArea .p-sign-heading{text-align:center;font-size:12px;font-weight:700;padding-bottom:6px;border-bottom:1px solid #dce5e3;}
+    #printArea .p-sign-notice{font-size:10px;line-height:1.6;color:#89979a;margin:12px 0 6px;}
     #printArea .p-sign-statement{font-size:10px;line-height:1.5;margin-top:8px;}
     #printArea .p-sign-bottom{font-size:11px;line-height:1.8;margin-top:auto;}
     #printArea .p-sign-bottom>div{margin-top:4px;}
@@ -510,7 +511,7 @@
         </div>
 
         <div class="card">
-          <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><div style="margin-top:6px;font-size:12px;color:#64736e">管理員／經理可於「條款範本管理」設定預設付款條件；有效期限由上方日期欄位獨立控制。</div></div>
+          <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" onclick="switchPanel('panel-templates')">管理付款條件／條款範本</button><span style="font-size:12px;color:#64736e">管理員／經理可設定預設條款</span></div><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><div style="margin-top:6px;font-size:12px;color:#64736e">管理員／經理可於「條款範本管理」設定預設付款條件；有效期限由上方日期欄位獨立控制。</div></div>
           <div class="field" style="margin-bottom:0;">
             <textarea id="f_notes" rows="5"></textarea>
           </div>
@@ -649,7 +650,7 @@
           <h2 id="templateFormTitle">新增條款範本</h2>
           <input type="hidden" id="template_edit_id">
           <div class="field"><label>範本名稱 *</label><input id="template_name" type="text" placeholder="例如：ISO 驗證方案"></div>
-          <div class="field" style="margin-top:12px;"><label>條款內容 *</label><textarea id="template_content" rows="6" placeholder="輸入報價條款"></textarea></div>
+          <div class="field" style="margin-top:12px;"><label>條款內容 *</label><textarea id="template_content" rows="8" placeholder="輸入報價條款"></textarea><div style="margin-top:8px"><button class="btn btn-line btn-sm" type="button" onclick="fillStandardPaymentTerms()">帶入常用二期付款條件（可修改）</button></div></div>
           <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:12px 0;">
             <label><input type="checkbox" id="template_active" checked> 啟用範本</label>
             <label><input type="checkbox" id="template_default"> 設為預設範本</label>
@@ -720,7 +721,7 @@
               <div class="field"><label>報價確認欄標題</label><input id="pdf_quote_sign_title"></div>
               <div class="field"><label>客戶簽章文字</label><input id="pdf_client_sign_label"></div>
               <div class="field"><label>報價方簽章文字</label><input id="pdf_quote_sign_label"></div>
-              <div class="field"><label>主管簽核文字</label><input id="pdf_approval_label"></div>
+              <div class="field" style="display:none"><label>主管簽核文字（停用）</label><input id="pdf_approval_label"></div>
               <div class="field"><label>LOGO 大小</label><select id="pdf_logo_size"><option value="small">小</option><option value="medium">中</option><option value="large">大</option></select></div>
               <div class="field" style="grid-column:1/-1;"><label>客戶簽回聲明</label><textarea id="pdf_client_confirm_text" rows="2"></textarea></div>
               <div class="field" style="grid-column:1/-1;">
@@ -951,15 +952,15 @@
     <tr class="grand"><td>總計</td><td style="text-align:right;" id="p_total"></td></tr>
   </table>
   <div class="p-notes" id="p_notes"></div>
+  <div class="p-sign-notice" id="p_client_confirm_text"></div>
   <div class="p-sign">
     <div class="p-sign-cell">
       <div class="p-sign-heading" id="p_client_sign_title"></div>
-      <div class="p-sign-statement" id="p_client_confirm_text"></div>
       <div class="p-sign-bottom" id="p_client_sign_label"></div>
     </div>
     <div class="p-sign-cell">
       <div class="p-sign-heading" id="p_quote_sign_title"></div>
-      <div class="p-sign-bottom"><div id="p_quote_sign_label"></div><div id="p_approval_label"></div></div>
+      <div class="p-sign-bottom"><div id="p_quote_sign_label"></div></div>
     </div>
   </div>
 </div>
@@ -2016,6 +2017,11 @@ function applyDefaultNoteTemplate(){
  document.getElementById('f_note_template').value=t?.id||'';
  if(t)document.getElementById('f_notes').value=t.content;
 }
+function fillStandardPaymentTerms(){
+ const input=document.getElementById('template_content');
+ if(input.value.trim()&&!confirm('將以常用二期付款條件取代目前編輯內容，確定嗎？'))return;
+ input.value='付款條件：二期付款（總價金之50%、50%）\n第一期：訂單確認後，七日內以匯款或即期支票。\n第二期：驗證通過，尾款付清後交付證書及 IAF 可查詢。';
+}
 function canManageNoteTemplates(){return ['admin','manager'].includes(currentProfile?.role);}
 function resetNoteTemplateForm(){
  document.getElementById('template_edit_id').value='';
@@ -2611,7 +2617,7 @@ async function downloadQuotationPdf(){
  // Copy relevant print styles to the clone, including the signature and table layout.
  const css=Array.from(document.styleSheets).filter(sheet=>{try{return !!sheet.cssRules;}catch(e){return false;}}).flatMap(sheet=>{try{return Array.from(sheet.cssRules).map(rule=>rule.cssText);}catch(e){return [];}}).join('\n');
  const style=document.createElement('style');
- style.textContent=css.replaceAll('#printArea','#pdfExportArea')+'\n#pdfExportArea{display:block!important;font-family:Arial,"Microsoft JhengHei",sans-serif;font-size:12px;line-height:1.6}#pdfExportArea .p-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}#pdfExportArea .p-head .qmeta{text-align:right;flex:0 0 36%}#pdfExportArea .p-client{margin:14px 0;line-height:1.8}#pdfExportArea .p-client-title{font-weight:700;border-bottom:1px solid #dce6e3}#pdfExportArea table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}#pdfExportArea td,#pdfExportArea th{padding:6px;border:1px solid #dce5e3}#pdfExportArea th{background:#e8f3f0}#pdfExportArea .p-totals{width:270px;margin-left:auto}#pdfExportArea .p-totals td{border:0}#pdfExportArea .p-totals .grand{font-weight:bold;border-top:1px solid #333}#pdfExportArea .p-sign{display:grid;grid-template-columns:1fr 1fr;border:1px solid #b7c7c5;margin-top:18px;break-inside:avoid}#pdfExportArea .p-sign-cell{box-sizing:border-box;padding:12px 14px;min-height:185px;display:flex;flex-direction:column;justify-content:space-between;overflow-wrap:anywhere}#pdfExportArea .p-sign-cell+.p-sign-cell{border-left:1px solid #b7c7c5}#pdfExportArea .p-sign-heading{text-align:center;font-weight:bold;border-bottom:1px solid #dce5e3}#pdfExportArea .p-notes{white-space:pre-wrap}#pdfExportArea tr{break-inside:avoid}';
+ style.textContent=css.replaceAll('#printArea','#pdfExportArea')+'\n#pdfExportArea{display:block!important;font-family:Arial,"Microsoft JhengHei",sans-serif;font-size:12px;line-height:1.6}#pdfExportArea .p-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}#pdfExportArea .p-head .qmeta{text-align:right;flex:0 0 36%}#pdfExportArea .p-client{margin:14px 0;line-height:1.8}#pdfExportArea .p-client-title{font-weight:700;border-bottom:1px solid #dce6e3}#pdfExportArea table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}#pdfExportArea td,#pdfExportArea th{padding:6px;border:1px solid #dce5e3}#pdfExportArea th{background:#e8f3f0}#pdfExportArea .p-totals{width:270px;margin-left:auto}#pdfExportArea .p-totals td{border:0}#pdfExportArea .p-totals .grand{font-weight:bold;border-top:1px solid #333}#pdfExportArea .p-sign-notice{font-size:10px;line-height:1.6;color:#89979a;margin:12px 0 6px}#pdfExportArea .p-sign{display:grid;grid-template-columns:1fr 1fr;border:1px solid #b7c7c5;margin-top:18px;break-inside:avoid}#pdfExportArea .p-sign-cell{box-sizing:border-box;padding:12px 14px;min-height:185px;display:flex;flex-direction:column;justify-content:space-between;overflow-wrap:anywhere}#pdfExportArea .p-sign-cell+.p-sign-cell{border-left:1px solid #b7c7c5}#pdfExportArea .p-sign-heading{text-align:center;font-weight:bold;border-bottom:1px solid #dce5e3}#pdfExportArea .p-notes{white-space:pre-wrap}#pdfExportArea tr{break-inside:avoid}';
  wrapper.append(style,clone);document.body.appendChild(wrapper);
  try{
   await document.fonts.ready;
@@ -2639,7 +2645,6 @@ function renderQuotationPrintArea(){
   document.getElementById('p_quote_sign_title').textContent=pdfSettings.quote_sign_title||'';
   document.getElementById('p_client_sign_label').textContent=pdfSettings.client_sign_label||'';
   document.getElementById('p_quote_sign_label').textContent=pdfSettings.quote_sign_label||'';
-  document.getElementById('p_approval_label').textContent=pdfSettings.approval_label||'';
   document.getElementById('p_client_confirm_text').textContent=pdfSettings.client_confirm_text||'';
   document.getElementById('p_logo').src=pdfLogoUrl();
   const size={small:40,medium:56,large:72}[pdfSettings.logo_size]||56;
