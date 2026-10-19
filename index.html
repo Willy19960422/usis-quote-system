@@ -513,24 +513,10 @@
         <div class="card">
           <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" onclick="switchPanel('panel-templates')">管理付款條件／條款範本</button><span style="font-size:12px;color:#64736e">管理員／經理可設定預設條款</span></div><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><div style="margin-top:6px;font-size:12px;color:#64736e">管理員／經理可於「條款範本管理」設定預設付款條件；有效期限由上方日期欄位獨立控制。</div></div>
           <div class="field" style="margin-bottom:0;">
-            <div class="grid2" style="margin-bottom:12px">
-              <div class="field"><label>付款方式（可選擇或自訂）</label><select id="f_payment_preset" onchange="applyQuoteTermSelections()">
-                <option value="">不指定／維持原條款</option>
-                <option value="驗收後 30 天內匯款">驗收後 30 天內匯款</option>
-                <option value="驗收後 15 天內匯款">驗收後 15 天內匯款</option>
-                <option value="訂單確認後 7 天內匯款">訂單確認後 7 天內匯款</option>
-                <option value="二期付款（50%、50%）">二期付款（50%、50%）</option>
-                <option value="custom">自訂付款方式</option>
-              </select><input id="f_payment_custom" placeholder="輸入自訂付款方式" style="display:none;margin-top:7px" oninput="applyQuoteTermSelections()"></div>
-              <div class="field"><label>未列項目費用</label><select id="f_extra_fee_preset" onchange="applyQuoteTermSelections()">
-                <option value="">不加入此條款</option>
-                <option value="本報價不含未列項目之額外費用。">本報價不含未列項目之額外費用。</option>
-                <option value="未列項目之費用另行報價。">未列項目之費用另行報價。</option>
-                <option value="custom">自訂條款</option>
-              </select><input id="f_extra_fee_custom" placeholder="輸入自訂費用條款" style="display:none;margin-top:7px" oninput="applyQuoteTermSelections()"></div>
-            </div>
-            <label style="display:block;margin-bottom:7px">付款條件與其他條款（可直接修改）</label>
-            <textarea id="f_notes" rows="5"></textarea>
+            <label style="display:block;margin-bottom:8px">報價條款（逐條編輯，可新增、刪除）</label>
+            <div id="quoteTermRows" style="display:flex;flex-direction:column;gap:9px"></div>
+            <button class="btn btn-line btn-sm" type="button" id="addQuoteTermBtn" onclick="addQuoteTermRow()" style="margin-top:10px">＋ 新增條款</button>
+            <textarea id="f_notes" style="display:none" aria-hidden="true"></textarea>
             <label style="display:block;margin:12px 0 7px">其他備註（選填）</label>
             <textarea id="f_extra_notes" rows="3" placeholder="例如：交付方式、特殊約定、客戶注意事項；不需要可留白"></textarea>
           </div>
@@ -2025,18 +2011,44 @@ async function loadNoteTemplates(){
  noteTemplates.filter(t=>t.is_active).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name+(t.is_default?'（預設）':'');el.appendChild(o);});
  renderNoteTemplates();
 }
-function applyQuoteTermSelections(){
- const payment=document.getElementById('f_payment_preset').value;
- const extra=document.getElementById('f_extra_fee_preset').value;
- document.getElementById('f_payment_custom').style.display=payment==='custom'?'block':'none';
- document.getElementById('f_extra_fee_custom').style.display=extra==='custom'?'block':'none';
- const p=payment==='custom'?document.getElementById('f_payment_custom').value.trim():payment;
- const e=extra==='custom'?document.getElementById('f_extra_fee_custom').value.trim():extra;
- const notes=document.getElementById('f_notes');
- const existing=notes.value.split('\n').filter(line=>!/^付款方式：|^本報價不含未列項目之額外費用。$|^未列項目之費用另行報價。$/.test(line.trim()));
- if(p)existing.push('付款方式：'+p);
- if(e)existing.push(e);
- notes.value=existing.join('\n').trim();
+function quoteTermValues(){
+ return Array.from(document.querySelectorAll('#quoteTermRows .quote-term-input')).map(x=>x.value.trim()).filter(Boolean);
+}
+function syncQuoteTermNotes(){
+ document.getElementById('f_notes').value=quoteTermValues().join('\n');
+}
+function addQuoteTermRow(value=''){
+ const holder=document.getElementById('quoteTermRows');
+ const row=document.createElement('div');
+ row.className='quote-term-row';
+ row.style.cssText='display:flex;align-items:center;gap:8px';
+ const num=document.createElement('span');
+ num.style.cssText='flex:0 0 24px;color:#64736e;text-align:right;font-size:13px';
+ const input=document.createElement('input');
+ input.className='quote-term-input';
+ input.type='text';input.value=value;
+ input.placeholder='輸入條款內容，例如：付款方式：驗收後 30 天內匯款';
+ input.style.cssText='flex:1;min-width:0';
+ input.disabled=!!currentQuote?.locked;
+ input.addEventListener('input',syncQuoteTermNotes);
+ const remove=document.createElement('button');
+ remove.className='btn btn-line btn-sm';
+ remove.type='button';remove.textContent='刪除';
+ remove.disabled=!!currentQuote?.locked;
+ remove.onclick=()=>{row.remove();renumberQuoteTerms();syncQuoteTermNotes();};
+ row.append(num,input,remove);holder.appendChild(row);
+ renumberQuoteTerms();syncQuoteTermNotes();
+}
+function renumberQuoteTerms(){
+ document.querySelectorAll('#quoteTermRows .quote-term-row').forEach((row,i)=>{row.firstChild.textContent=(i+1)+'.';});
+}
+function setQuoteTermRows(value){
+ const holder=document.getElementById('quoteTermRows');
+ holder.replaceChildren();
+ const lines=String(value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+ lines.forEach(line=>addQuoteTermRow(line.replace(/^\\d+[.、]\s*/,'')));
+ if(!lines.length)addQuoteTermRow('');
+ syncQuoteTermNotes();
 }
 function splitQuoteNotes(value){
  const text=String(value||'');
@@ -2046,7 +2058,7 @@ function splitQuoteNotes(value){
 }
 function loadQuoteNotes(value){
  const parts=splitQuoteNotes(value);
- document.getElementById('f_notes').value=parts.terms;
+ setQuoteTermRows(parts.terms);
  document.getElementById('f_extra_notes').value=parts.extra;
  document.getElementById('f_payment_preset').value='';
  document.getElementById('f_extra_fee_preset').value='';
@@ -2056,7 +2068,7 @@ function loadQuoteNotes(value){
  document.getElementById('f_extra_fee_custom').style.display='none';
 }
 function combinedQuoteNotes(){
- const terms=document.getElementById('f_notes').value.trim();
+ const terms=quoteTermValues().join('\n');
  const extra=document.getElementById('f_extra_notes').value.trim();
  return terms+(extra?(terms?'\n備註：\n':'備註：\n')+extra:'');
 }
@@ -2064,12 +2076,12 @@ function applyNoteTemplate(id){
  const t=noteTemplates.find(t=>t.id===id);if(!t)return;
  const el=document.getElementById('f_notes');
  if(el.value.trim()&&el.value!==t.content&&!confirm('套用範本會覆蓋現有備註，確定嗎？')){document.getElementById('f_note_template').value='';return;}
- el.value=t.content;
+ setQuoteTermRows(t.content);
 }
 function applyDefaultNoteTemplate(){
  const t=noteTemplates.find(t=>t.is_default&&t.is_active);
  document.getElementById('f_note_template').value=t?.id||'';
- if(t)document.getElementById('f_notes').value=t.content;
+ if(t)setQuoteTermRows(t.content);
 }
 function fillStandardPaymentTerms(){
  const input=document.getElementById('template_content');
@@ -2330,6 +2342,8 @@ function setLocked(locked){
   });
   document.querySelectorAll('#itemsBody input, #itemsBody select').forEach(el=> el.disabled = locked);
   document.getElementById('f_note_template').disabled = locked;
+  document.querySelectorAll('#quoteTermRows .quote-term-input, #quoteTermRows button').forEach(el=>el.disabled=locked);
+  document.getElementById('addQuoteTermBtn').disabled=locked;
   document.getElementById('saveBtn').disabled = locked;
   document.querySelectorAll('#panel-editor button[onclick^="saveV21Library"], #panel-editor button[onclick^="openV21Library"], #panel-editor button[onclick^="saveAsNew"], #panel-editor button[onclick^="resetEditor"]').forEach(el=>el.disabled=locked);
   document.querySelectorAll('#panel-editor button[onclick^="setValidityDays"], #panel-editor button[onclick^="useLastClientQuote"], #panel-editor button[onclick^="addItemRow"], #panel-editor button[onclick^="openCatalogPicker"], #itemsBody button.row-remove').forEach(el=>el.disabled=locked);
