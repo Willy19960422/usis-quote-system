@@ -256,6 +256,35 @@
   .toast.show{opacity:1;transform:translateY(0);}
   .toast.err{background:var(--rejected);}
 
+
+  /* V2.1 quotation-first editor layout */
+  #panel-editor{max-width:1180px;margin:0 auto;}
+  #panel-editor .quote-editor-hero{background:linear-gradient(120deg,#123d46,#17645f);color:white;border-radius:12px;padding:23px 28px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:20px;box-shadow:0 8px 22px rgba(10,54,57,.12);}
+  #panel-editor .quote-editor-hero .eyebrow{font-size:11px;letter-spacing:1.8px;opacity:.8;margin-bottom:6px;}
+  #panel-editor .quote-editor-hero .headline{font-size:23px;font-weight:750;line-height:1.3;}
+  #panel-editor .quote-editor-hero .subline{font-size:12px;opacity:.82;margin-top:7px;}
+  #panel-editor .quote-editor-hero .hero-total{text-align:right;white-space:nowrap;}
+  #panel-editor .quote-editor-hero .hero-total .caption{font-size:12px;opacity:.85;}
+  #panel-editor .quote-editor-hero .hero-total strong{display:block;font-size:29px;font-weight:750;letter-spacing:.3px;margin-top:4px;}
+  #panel-editor .card{border-radius:11px;box-shadow:0 2px 12px rgba(15,45,50,.045);border:1px solid #e2e9e8;margin-bottom:18px;padding:24px 27px;}
+  #panel-editor .card h2{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:17px;letter-spacing:.2px;border-bottom:1px solid #e7edeb;padding-bottom:15px;margin-bottom:19px;}
+  #panel-editor .editor-step{display:inline-flex;align-items:center;justify-content:center;width:27px;height:27px;border-radius:8px;background:#e7f3f0;color:#17645f;font-size:13px;font-weight:750;margin-right:9px;flex:none;}
+  #panel-editor .editor-heading-label{display:flex;align-items:center;min-width:0;}
+  #panel-editor .editor-helper{font-size:12px;color:#647c80;margin:-8px 0 16px;}
+  #panel-editor .field input:focus,#panel-editor .field select:focus,#panel-editor .field textarea:focus{outline:2px solid rgba(21,109,100,.18);border-color:#18746c;}
+  #panel-editor .items-table th{white-space:nowrap;background:#edf5f3;color:#234d4b;font-size:12px;}
+  #panel-editor .items-table td{vertical-align:middle;}
+  #panel-editor .totals{margin-top:20px;border-top:1px solid #e3eae8;padding-top:12px;}
+  #panel-editor .totals .grand{color:#0d645c;}
+  #panel-editor .panel-actions{position:sticky;bottom:0;z-index:30;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border:1px solid #dfe9e6;border-radius:10px;padding:13px 16px;box-shadow:0 -5px 25px rgba(12,50,50,.07);}
+  @media(max-width:760px){
+   #panel-editor .quote-editor-hero{padding:18px;flex-direction:column;align-items:flex-start;}
+   #panel-editor .quote-editor-hero .hero-total{text-align:left;}
+   #panel-editor .card{padding:18px 15px;}
+   #panel-editor .card h2{flex-wrap:wrap;}
+   #panel-editor .panel-actions{position:static;}
+  }
+
   #printArea{display:none;}
   @media print{
     @page{size:A4 portrait;margin:12mm 14mm;}
@@ -397,13 +426,21 @@
 
       <!-- 1. 新增／編輯報價單 -->
       <div class="panel active" id="panel-editor">
+        <div class="quote-editor-hero">
+          <div>
+            <div class="eyebrow">USIS · QUOTATION WORKSPACE</div>
+            <div class="headline">企業正式報價單</div>
+            <div class="subline">依照正式 PDF 順序填寫：報價資訊 → 客戶 → 服務 → 金額 → 條款</div>
+          </div>
+          <div class="hero-total"><div class="caption">目前報價總額（含稅）</div><strong id="editorHeroTotal">NT$0</strong></div>
+        </div>
         <div id="lockedBanner" class="locked-banner" style="display:none;">
           <span>🔒 此報價單狀態為「已接受」，已鎖定無法編輯。如需修改請先解鎖。</span>
           <button class="btn btn-sm btn-line" onclick="unlockQuote()">解鎖</button>
         </div>
 
         <div class="card">
-          <h2><span class="n" id="quoteNoDisplay">自動產生</span>報價單資訊</h2>
+          <h2><span class="editor-heading-label"><span class="editor-step">01</span>報價單資訊 <span class="n" id="quoteNoDisplay" style="margin-left:10px">自動產生</span></span></h2>
           <div class="grid3">
             <div class="field"><label>開立日期</label><input type="date" id="f_issue_date"></div>
             <div class="field"><label>有效期限</label><input type="date" id="f_valid_until"></div>
@@ -413,7 +450,7 @@
 
         <div class="card">
           <h2>
-            <span>客戶資訊</span>
+            <span class="editor-heading-label"><span class="editor-step">02</span>客戶資訊</span>
             <button class="btn btn-line btn-sm" onclick="openClientPicker()">+ 從既有客戶帶入</button>
           </h2>
           <div class="grid2">
@@ -427,7 +464,7 @@
         </div>
 
         <div class="card">
-          <h2>服務項目</h2>
+          <h2><span class="editor-heading-label"><span class="editor-step">03</span>服務項目與金額</span></h2><div class="editor-helper">可直接編輯項目、規格、數量與單價；贈送項目不計入應付金額。</div>
           <div style="overflow-x:auto;width:100%;"><table class="items-table">
             <thead>
               <tr>
@@ -462,7 +499,7 @@
         </div>
 
         <div class="card">
-          <h2>備註／條款</h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select></div>
+          <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select></div>
           <div class="field" style="margin-bottom:0;">
             <textarea id="f_notes" rows="5"></textarea>
           </div>
@@ -2107,6 +2144,7 @@ function recalcTotals(){
   document.getElementById('t_subtotal').textContent = money(subtotal);
   document.getElementById('t_tax').textContent = money(tax);
   document.getElementById('t_total').textContent = money(total);
+  document.getElementById('editorHeroTotal').textContent = money(total);
   return { subtotal, tax, total, taxRate };
 }
 
