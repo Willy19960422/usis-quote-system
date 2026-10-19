@@ -2035,11 +2035,33 @@ function renderTermStages(){
   const row=document.createElement('div');row.style.cssText='display:grid;grid-template-columns:65px 100px minmax(0,1fr);gap:8px;align-items:center;margin:8px 0';
   const label=document.createElement('strong');label.textContent=termNames[i]+'：';
   const pct=document.createElement('input');pct.type='number';pct.min=0;pct.max=100;pct.step='.01';pct.value=stage.pct;pct.title='付款比例 %';
-  pct.oninput=()=>{stage.pct=Number(pct.value);syncQuoteTermNotes();};
+  pct.oninput=()=>{stage.pct=Number(pct.value);syncQuoteTermNotes();updateInstallmentAmounts();};
   const detail=document.createElement('input');detail.value=stage.detail;detail.placeholder='此期付款條件';detail.oninput=()=>{stage.detail=detail.value;syncQuoteTermNotes();};
   pct.disabled=detail.disabled=!!currentQuote?.locked;
-  row.append(label,pct,detail);holder.appendChild(row);
- });syncQuoteTermNotes();
+  const amount=document.createElement('div');amount.className='term-stage-amount';amount.style.cssText='grid-column:3;font-size:12px;color:#52706a;text-align:right';amount.textContent='應付金額：—';
+  row.append(label,pct,detail,amount);holder.appendChild(row);
+ });syncQuoteTermNotes();updateInstallmentAmounts();
+}
+function installmentAmounts(total){
+ const cents=Math.round((Number(total)||0)*100);
+ let allocated=0;
+ return termStages.map((stage,i)=>{
+  const value=i===termStages.length-1?cents-allocated:Math.round(cents*(Number(stage.pct)||0)/100);
+  allocated+=value;return value/100;
+ });
+}
+function updateInstallmentAmounts(total){
+ const rows=document.querySelectorAll('#termStageRows .term-stage-amount');
+ if(!rows.length)return;
+ if(total===undefined){
+  const subtotal=editorItems.reduce((n,x)=>n+(x.is_gift?0:Number(x.quantity)*Number(x.unit_price)),0);
+  const rate=Number(document.getElementById('f_tax_rate').value)||0;
+  const type=document.getElementById('f_discount_type').value;
+  const v=Math.max(0,Number(document.getElementById('f_discount_value').value)||0);
+  const discount=Math.min(subtotal,type==='percent'?Math.round(subtotal*Math.min(100,v)/100):type==='fixed'?v:0);
+  total=subtotal-discount+Math.round((subtotal-discount)*rate/100);
+ }
+ installmentAmounts(total).forEach((amount,i)=>{if(rows[i])rows[i].textContent='應付金額：'+money(amount);});
 }
 function structuredTerms(){
  const days=Number(document.getElementById('termDays').value);
@@ -2047,7 +2069,9 @@ function structuredTerms(){
  const label=document.getElementById('termTotal');
  label.textContent='付款比例合計 '+sum+'%'+(Math.abs(sum-100)<0.001?' ✓':'（需等於100%）');
  label.style.color=Math.abs(sum-100)<0.001?'#16805e':'#b93c34';
- return ['有效期限：'+days+'天','付款條件：'+termStages.length+'期付款（總價金之'+termStages.map(x=>x.pct+'%').join('、')+'）',...termStages.map((x,i)=>termNames[i]+'：'+x.detail)];
+ const total=Number(document.getElementById('t_total').textContent.replace(/[^0-9.-]/g,''))||0;
+ const amounts=installmentAmounts(total);
+ return ['有效期限：'+days+'天','付款條件：'+termStages.length+'期付款（總價金之'+termStages.map(x=>x.pct+'%').join('、')+'）',...termStages.map((x,i)=>termNames[i]+'：'+x.detail+'（應付金額：'+money(amounts[i])+'）')];
 }
 function parseTermStructure(text){
  const rest=[];let stages=null,days=null;const details={};
@@ -2057,7 +2081,7 @@ function parseTermStructure(text){
   m=line.match(/^付款條件：\s*(\d+)期付款（總價金之(.+)）/);
   if(m){const pct=m[2].match(/\d+(?:\.\d+)?(?=%)/g)||[];if(pct.length===Number(m[1])&&pct.length<=6)stages=pct.map(x=>({pct:Number(x),detail:''}));continue;}
   const i=termNames.findIndex(x=>line.startsWith(x+'：'));
-  if(i>=0){details[i]=line.slice(termNames[i].length+1);continue;}
+  if(i>=0){details[i]=line.slice(termNames[i].length+1).replace(/（應付金額：.*?）$/,'');continue;}
   rest.push(line);
  }
  if(stages){termStages=stages;document.getElementById('termCount').value=String(stages.length);}
@@ -2381,6 +2405,7 @@ function recalcTotals(){
   document.getElementById('t_subtotal').textContent = money(subtotal);
   document.getElementById('t_tax').textContent = money(tax);
   document.getElementById('t_total').textContent = money(total);
+  updateInstallmentAmounts(total);
 
   return { subtotal, discount, discountType, discountValue, tax, total, taxRate };
 }
