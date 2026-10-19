@@ -285,6 +285,22 @@
    #panel-editor .panel-actions{position:static;}
   }
 
+ 
+  /* PDF aligned with the provided original blank quotation */
+  #printArea .p-head{align-items:flex-start;}
+  #printArea .p-head .qmeta{text-align:right;line-height:1.8;}
+  #printArea .p-client{line-height:1.8;margin:14px 0;}
+  #printArea .p-client-title{font-weight:700;color:var(--pdf-brand,#0F625E);border-bottom:1px solid #dce6e3;margin-bottom:6px;}
+  #printArea .p-item-description{font-size:10px;color:#54615e;margin-top:3px;white-space:pre-wrap;}
+  #printArea .p-gift-note{font-size:10px;color:var(--pdf-brand,#0F625E);margin-top:3px;}
+  #printArea table:not(.p-totals) th:nth-child(1){width:9%;text-align:center;}
+  #printArea table:not(.p-totals) th:nth-child(2){width:48%;}
+  #printArea table:not(.p-totals) th:nth-child(3){width:13%;}
+  #printArea table:not(.p-totals) th:nth-child(4){width:15%;}
+  #printArea table:not(.p-totals) th:nth-child(5){width:15%;}
+  #printArea table:not(.p-totals) td:nth-child(1){text-align:center;}
+  #printArea table:not(.p-totals) td:nth-child(n+3){text-align:right;}
+
   #printArea{display:none;}
   @media print{
     @page{size:A4 portrait;margin:12mm 14mm;}
@@ -929,7 +945,7 @@
   </div>
   <div class="p-client" id="p_client"></div>
   <table>
-    <thead><tr><th>項目</th><th>說明</th><th>單位</th><th>數量</th><th>單價</th><th>小計</th></tr></thead>
+    <thead><tr><th>項目</th><th>品名規格／服務內容</th><th>數量</th><th>單價</th><th>金額</th></tr></thead>
     <tbody id="p_items"></tbody>
   </table>
   <table class="p-totals">
@@ -2414,20 +2430,23 @@ function printQuotation(){
   document.getElementById('printArea').style.setProperty('--pdf-brand',pdfSettings.brand_color||'#0F625E');
   const metaParts = [companySettings.address, companySettings.phone ? '電話：'+companySettings.phone : '', companySettings.tax_id ? '統編：'+companySettings.tax_id : ''].filter(Boolean);
   document.getElementById('p_company_meta').textContent = metaParts.join(' ');
-  document.getElementById('p_quote_no').textContent = currentQuote ? currentQuote.quote_no : '（尚未儲存）';
-  document.getElementById('p_dates').textContent = `開立日期：${data.issue_date} 有效期限：${data.valid_until||'-'}`;
+  document.getElementById('p_quote_no').textContent = '報價單號：' + (currentQuote ? currentQuote.quote_no : '（尚未儲存）');
+  document.getElementById('p_dates').innerHTML = `報價日期：${escapeHtml(data.issue_date)}<br>有效期限：${escapeHtml(data.valid_until||'-')}<br>報價人員：${escapeHtml(data.sales_rep||'-')}`;
 
   document.getElementById('p_client').innerHTML = `
-    <b>${escapeHtml(data.client_name||'')}</b><br>
-    聯絡人：${escapeHtml(data.contact_person||'-')} 統編：${escapeHtml(data.tax_id||'-')}<br>
-    地址：${escapeHtml(data.address||'-')}<br>
-    電話：${escapeHtml(data.phone||'-')} Email：${escapeHtml(data.email||'-')}`;
+    <div class="p-client-title">客戶資訊</div>
+    <div>客戶名稱：<b>${escapeHtml(data.client_name||'-')}</b></div>
+    <div>聯絡人員：${escapeHtml(data.contact_person||'-')}</div>
+    <div>統一編號：${escapeHtml(data.tax_id||'-')}</div>
+    <div>聯絡電話：${escapeHtml(data.phone||'-')}</div>
+    <div>聯絡地址：${escapeHtml(data.address||'-')}</div>
+    <div>電子郵件：${escapeHtml(data.email||'-')}</div>`;
 
   const itemsBody = document.getElementById('p_items');
   itemsBody.innerHTML = '';
   editorItems.filter(r=>r.item_name.trim()).forEach(r=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td><b>${escapeHtml(r.item_name)}</b></td><td>${escapeHtml(r.description)}</td><td>${escapeHtml(r.unit)}</td><td>${r.quantity}</td><td>${money(r.unit_price)}</td><td>${r.is_gift ? "方案贈送" : money(r.quantity*r.unit_price)}</td>`;
+    tr.innerHTML = `<td>${itemsBody.children.length+1}</td><td><b>${escapeHtml(r.item_name)}</b>${r.description ? `<div class="p-item-description">${escapeHtml(r.description)}</div>` : ""}${r.is_gift ? `<div class="p-gift-note">方案贈送 · 參考單價 ${money(r.unit_price)}</div>` : ""}</td><td>${r.quantity} ${escapeHtml(r.unit)}</td><td>${money(r.unit_price)}</td><td>${r.is_gift ? "方案贈送" : money(r.quantity*r.unit_price)}</td>`;
     itemsBody.appendChild(tr);
   });
   document.getElementById('p_subtotal').textContent = money(data.subtotal);
