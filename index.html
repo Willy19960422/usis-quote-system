@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <style>
   :root{
     --brand:#028090;
@@ -530,7 +531,8 @@
         <div class="panel-actions">
           <button class="btn btn-primary" id="saveBtn" onclick="saveQuotation()">儲存報價單</button>
           <button class="btn btn-line" onclick="saveAsNew()">另存新報價單</button>
-          <button class="btn btn-line" onclick="printQuotation()">列印／匯出 PDF</button>
+          <button class="btn btn-primary" onclick="downloadQuotationPdf()">下載 PDF</button>
+          <button class="btn btn-line" onclick="printQuotation()">列印／另存 PDF</button>
           <button class="btn btn-line" onclick="resetEditor()">清空重新填寫</button>
           <button class="btn btn-danger" id="deleteBtn" onclick="deleteQuotation()" style="display:none;">刪除</button>
         </div>
@@ -962,6 +964,13 @@
   </div>
 </div>
 
+<div id="v21LibraryModal" role="dialog" aria-modal="true" aria-label="套餐與報價範本管理" style="display:none;position:fixed;inset:0;background:#0c222b99;z-index:9999;align-items:center;justify-content:center;padding:18px">
+  <div style="background:#fff;color:#233;border-radius:12px;padding:24px;width:min(700px,100%);max-height:85vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 id="v21LibraryTitle" style="margin:0">管理</h2><button class="btn btn-line btn-sm" onclick="closeV21Library()">關閉</button></div>
+    <p style="font-size:13px;color:#64736e;margin:12px 0">點選「套用」將項目帶入目前報價；管理員與經理可刪除已建立的套餐或範本。</p>
+    <div id="v21LibraryList"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2070,29 +2079,52 @@ async function deleteNoteTemplate(id){
 const V21_TABLES={bundle:'service_bundles',template:'quotation_templates'};
 function canManageV21Library(){return ['admin','manager'].includes(currentProfile?.role);}
 function serializeV21Items(){return editorItems.filter(r=>r.item_name.trim()).map(({category,item_name,description,unit,quantity,unit_price,is_gift})=>({category,item_name,description,unit,quantity,unit_price,is_gift}));}
+let v21LibraryKind='bundle';
+function closeV21Library(){document.getElementById('v21LibraryModal').style.display='none';}
 async function openV21Library(kind){
- if(currentQuote?.locked){toast('此報價單已鎖定',true);return;}
+ if(currentQuote?.locked || (currentQuote && !['admin','manager'].includes(currentProfile?.role) && currentQuote.user_id!==currentUser.id)){toast('此報價單為唯讀，無法套用',true);return;}
  const table=V21_TABLES[kind];if(!table)return;
+ v21LibraryKind=kind;
  const {data,error}=await sb.from(table).select('*').order('name');
- if(error){toast('無法載入'+(kind==='bundle'?'服務套餐':'報價範本')+'：請先執行 V2.1 資料庫 SQL。'+error.message,true);return;}
- if(!data?.length){toast('目前沒有可套用的'+(kind==='bundle'?'套餐':'範本'));return;}
- const list=data.map((x,i)=>(i+1)+'. '+x.name).join('\n');
- const selected=prompt('輸入要套用的編號：\n'+list);
- if(selected===null)return;
- const i=Number(selected)-1;if(!Number.isInteger(i)||i<0||i>=data.length){toast('編號無效',true);return;}
- const chosen=data[i];
- if(kind==='template'&&!confirm('套用報價範本將取代目前明細與備註，確定嗎？'))return;
- const rows=(chosen.items||[]).map(x=>blankItemRow(x));
- if(kind==='bundle'){
-  if(editorItems.length===1&&!editorItems[0].item_name.trim())editorItems=[];
-  editorItems.push(...rows);
- }else{
-  editorItems=rows;
-  document.getElementById('f_notes').value=chosen.notes||'';
-  document.getElementById('f_tax_rate').value=chosen.tax_rate??5;
- }
- if(!editorItems.length)editorItems=[blankItemRow()];
- renderItems();recalcTotals();toast('已套用：'+chosen.name);
+ if(error){toast('載入失敗：請確認已執行 V2.1 SQL。'+error.message,true);return;}
+ document.getElementById('v21LibraryTitle').textContent=kind==='bundle'?'服務套餐':'整張報價單範本';
+ const list=document.getElementById('v21LibraryList');list.replaceChildren();
+ if(!data?.length){const empty=document.createElement('p');empty.textContent='目前尚無資料。可先從報價編輯器儲存一筆。';list.appendChild(empty);}
+ (data||[]).forEach(item=>{
+  const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e9e7;padding:12px 0';
+  const info=document.createElement('div');
+  const title=document.createElement('strong');title.textContent=item.name;info.appendChild(title);
+  const detail=document.createElement('div');detail.style.cssText='font-size:12px;color:#64736e;margin-top:4px';
+  const amount=(item.items||[]).reduce((sum,x)=>sum+(x.is_gift?0:(Number(x.quantity)||0)*(Number(x.unit_price)||0)),0);
+  detail.textContent=(item.items||[]).length+' 項服務 · 合計 '+money(amount)+'（可套用後調整）';info.appendChild(detail);
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:6px;flex-shrink:0';
+  const apply=document.createElement('button');apply.className='btn btn-primary btn-sm';apply.textContent='套用';
+  apply.onclick=()=>{
+   if(kind==='template'&&!confirm('將取代目前服務明細與備註，確定套用？'))return;
+   const rows=(item.items||[]).map(x=>blankItemRow(x));
+   if(kind==='bundle'){
+    if(editorItems.length===1&&!editorItems[0].item_name.trim())editorItems=[];
+    editorItems.push(...rows);
+   }else{
+    editorItems=rows;
+    document.getElementById('f_notes').value=item.notes||'';
+    document.getElementById('f_tax_rate').value=item.tax_rate??5;
+   }
+   if(!editorItems.length)editorItems=[blankItemRow()];
+   renderItems();recalcTotals();closeV21Library();toast('已套用：'+item.name);
+  };actions.appendChild(apply);
+  if(canManageV21Library()){
+   const del=document.createElement('button');del.className='btn btn-line btn-sm';del.textContent='刪除';
+   del.onclick=async()=>{
+    if(!confirm('確定刪除「'+item.name+'」？既有報價不受影響。'))return;
+    const {error:e}=await sb.from(table).delete().eq('id',item.id);
+    if(e){toast('刪除失敗：'+e.message,true);return;}
+    closeV21Library();await openV21Library(kind);
+   };actions.appendChild(del);
+  }
+  row.append(info,actions);list.appendChild(row);
+ });
+ document.getElementById('v21LibraryModal').style.display='flex';
 }
 async function saveV21Library(kind){
  if(!canManageV21Library()){toast('只有管理員或經理可以管理套餐與範本',true);return;}
@@ -2517,6 +2549,36 @@ async function unlockQuote(){
   toast('已解鎖，可以編輯');
 }
 
+/* ================= 下載正式 PDF ================= */
+async function downloadQuotationPdf(){
+ if(typeof html2pdf!=='function'){toast('PDF 產生元件尚未載入，請稍後重試或使用列印功能',true);return;}
+ const name=document.getElementById('f_client_name').value.trim()||'未命名客戶';
+ const no=currentQuote?.quote_no||'草稿';
+ const clean=x=>String(x).replace(/[\\/:*?"<>|\\x00-\\x1f]/g,'_').slice(0,70);
+ // Build the print markup first; printing is temporarily suppressed for this render.
+ const originalPrint=window.print;
+ window.print=()=>{};
+ try{printQuotation();}finally{window.print=originalPrint;}
+ const original=document.getElementById('printArea');
+ const wrapper=document.createElement('div');
+ wrapper.style.cssText='position:fixed;left:-20000px;top:0;width:794px;background:white;z-index:-1;';
+ const clone=original.cloneNode(true);
+ clone.id='pdfExportArea';
+ clone.style.cssText='display:block!important;visibility:visible!important;width:100%;box-sizing:border-box;padding:28px 30px;background:white;color:#233;';
+ // Copy relevant print styles to the clone, including the signature and table layout.
+ const css=Array.from(document.styleSheets).filter(sheet=>{try{return !!sheet.cssRules;}catch(e){return false;}}).flatMap(sheet=>{try{return Array.from(sheet.cssRules).map(rule=>rule.cssText);}catch(e){return [];}}).join('\n');
+ const style=document.createElement('style');
+ style.textContent=css.replaceAll('#printArea','#pdfExportArea')+'\n#pdfExportArea{display:block!important}#pdfExportArea table{width:100%;border-collapse:collapse}#pdfExportArea td,#pdfExportArea th{padding:6px;border:1px solid #dce5e3}';
+ wrapper.append(style,clone);document.body.appendChild(wrapper);
+ try{
+  await document.fonts.ready;
+  const images=Array.from(clone.querySelectorAll('img'));
+  await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));
+  await html2pdf().set({margin:0,filename:clean('USIS_報價單_'+no+'_'+name)+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(clone).save();
+  toast('PDF 已產生');
+ }catch(e){console.error(e);toast('PDF 下載失敗：'+e.message+'，可改用列印／另存 PDF',true);}
+ finally{wrapper.remove();}
+}
 /* ================= 列印 / PDF ================= */
 function printQuotation(){
   const data = collectFormData();
