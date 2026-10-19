@@ -1,0 +1,2454 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USIS 報價單系統</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --brand:#028090;
+    --brand-dark:#01606c;
+    --brand-tint:#e3f0f1;
+    --ink:#10262a;
+    --muted:#5c7275;
+    --bg:#f4f7f7;
+    --surface:#ffffff;
+    --border:#dbe5e5;
+    --draft:#8a9a9c;
+    --sent:#c98a3e;
+    --accepted:#2f8f6b;
+    --rejected:#c1554a;
+    --expired:#9a6b6b;
+    --danger:#c1554a;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+  body{
+    font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;font-size:14px;}
+
+  .center-screen{
+    height:100vh;overflow-y:auto;display:flex;align-items:center;justify-content:center;
+    padding:24px;
+  }
+  .auth-card{
+    width:100%;max-width:400px;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--radius);
+    padding:36px 32px;
+  }
+  .auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+  .auth-brand .logo-img{width:42px;height:42px;object-fit:contain;flex:none;}
+  .auth-brand .title{font-weight:700;font-size:16.5px;letter-spacing:.02em;color:var(--ink);}
+  .auth-brand .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;}
+  .field input, .field select, .field textarea{
+    width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:5px;
+    background:#fff;color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint);
+  }
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 18px;border-radius:5px;border:1px solid transparent;
+    font-size:13.5px;font-weight:500;transition:background .12s,border-color .12s;
+    width:auto;
+  }
+  .btn-primary{background:var(--brand);color:#fff;}
+  .btn-primary:hover{background:var(--brand-dark);}
+  .btn-line{background:#fff;border-color:var(--border);color:var(--ink);}
+  .btn-line:hover{border-color:var(--brand);color:var(--brand);}
+  .btn-ghost{background:transparent;color:var(--muted);}
+  .btn-ghost:hover{color:var(--ink);}
+  .btn-danger{background:#fff;border-color:var(--danger);color:var(--danger);}
+  .btn-danger:hover{background:var(--danger);color:#fff;}
+  .btn-sm{padding:6px 11px;font-size:12.5px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .error-msg{
+    background:#fbeceb;border:1px solid #f0c9c5;color:var(--rejected);
+    padding:8px 11px;border-radius:5px;font-size:12.5px;margin-bottom:14px;
+  }
+  .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
+
+  #app{display:none;height:100vh;overflow:hidden;}
+  .shell{display:flex;height:100vh;overflow:hidden;}
+  .sidebar{
+    width:220px;height:100vh;flex:none;background:var(--ink);color:#cfe3e2;
+    display:flex;flex-direction:column;padding:20px 14px;
+  }
+  .sidebar .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 22px;}
+  .sidebar .brand .logo-img{width:32px;height:32px;object-fit:contain;}
+  .sidebar .brand .title{color:#fff;font-weight:700;font-size:14.5px;}
+  .sidebar .brand .sub{font-size:10.5px;color:#7ea3a1;}
+  .nav-item{
+    display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:6px;
+    color:#b9d2d0;font-size:13.5px;margin-bottom:2px;border:none;background:transparent;width:100%;text-align:left;
+  }
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
+  .nav-item.active{background:var(--brand);color:#fff;}
+  .sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);}
+  .user-chip{padding:8px;font-size:12px;color:#9fc0be;line-height:1.5;}
+  .user-chip .role{
+    display:inline-block;font-size:10.5px;background:rgba(255,255,255,.12);
+    padding:2px 8px;border-radius:10px;margin-top:4px;color:#e3f0f1;font-weight:600;
+  }
+  .user-chip .role.admin{background:var(--brand);color:#fff;}
+  .user-chip .role.manager{background:var(--sent);color:#fff;}
+
+  .main{flex:1;height:100vh;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 36px;border-bottom:1px solid var(--border);background:var(--surface);flex:none;
+  }
+  .topbar h1{font-size:17px;margin:0;font-weight:700;}
+  .topbar .desc{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  
+  .content{padding:28px 36px;overflow-y:auto;flex:1;}
+  .panel{display:none;max-width:1200px;margin:0 auto;}
+  .panel.active{display:block;}
+
+  .settings-tabs{
+    display:flex;
+    gap:8px;
+    border-bottom:1px solid var(--border);
+    margin-bottom:22px;
+    padding-bottom:1px;
+  }
+  .tab-btn{
+    padding:9px 16px;
+    border:none;
+    background:transparent;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--muted);
+    border-radius:6px 6px 0 0;
+    border-bottom:2px solid transparent;
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .tab-btn:hover{color:var(--ink);}
+  .tab-btn.active{
+    color:var(--brand);
+    border-bottom-color:var(--brand);
+    background:var(--surface);
+  }
+  .settings-subpanel{display:none;}
+  .settings-subpanel.active{display:block;}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px 22px;margin-bottom:18px;
+  }
+  .card h2{font-size:14px;margin:0 0 16px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:space-between;}
+  .card h2 .n{color:var(--brand);margin-right:6px;font-family:'IBM Plex Mono',monospace;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{
+    text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;
+    padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
+  }
+  td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  
+  .items-table{width:100%;table-layout:fixed;min-width:920px;}
+  .items-table th:nth-child(1){width:120px;}
+  .items-table th:nth-child(2){width:23%;}
+  .items-table th:nth-child(3){width:auto;}
+  .items-table th:nth-child(4){width:60px;}
+  .items-table th:nth-child(5){width:75px;}
+  .items-table th:nth-child(6){width:110px;}
+  .items-table th:nth-child(7){width:58px;text-align:center;}
+  .items-table th:nth-child(8){width:115px;}
+  .items-table th:nth-child(9){width:42px;}
+  .items-table td:nth-child(7){text-align:center;}
+  .items-table td:nth-child(8){white-space:nowrap;}
+  .items-table input, .items-table select{padding:6px 8px;font-size:13px;width:100%;}
+  .items-table input[type="checkbox"]{width:16px;height:16px;margin:0;vertical-align:middle;cursor:pointer;}
+  .items-table td:nth-child(9) .row-remove{margin:auto;}
+  .items-table input.qty, .items-table input.price{text-align:right;}
+  .items-table td.num-col{text-align:right;}
+  .row-remove{
+    width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:#fff;
+    color:var(--muted);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
+  }
+  .row-remove:hover{border-color:var(--rejected);color:var(--rejected);}
+
+  .totals{display:flex;justify-content:flex-end;margin-top:12px;}
+  .totals table{width:280px;}
+  .totals td{border:none;padding:5px 4px;}
+  .totals .label{color:var(--muted);}
+  .totals .amount{text-align:right;}
+  .totals .grand td{font-weight:700;font-size:15.5px;border-top:1px solid var(--border);padding-top:9px;color:var(--brand-dark);}
+
+  .badge{
+    display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:600;color:#fff;
+  }
+  .badge.draft{background:var(--draft);}
+  .badge.sent{background:var(--sent);}
+  .badge.accepted{background:var(--accepted);}
+  .badge.rejected{background:var(--rejected);}
+  .badge.expired{background:var(--expired);}
+
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+  .toolbar input[type=text], .toolbar select{
+    padding:8px 10px;border:1px solid var(--border);border-radius:5px;font-size:13px;
+  }
+  .spacer{flex:1;}
+
+  .locked-banner{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:#fff7ea;border:1px solid #f0dcae;color:#8a6a1f;
+    padding:10px 14px;border-radius:5px;font-size:13px;margin-bottom:16px;
+  }
+
+  .empty-state{text-align:center;padding:50px 20px;color:var(--muted);font-size:13.5px;}
+
+  .panel-actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    margin-top:20px;
+    padding-bottom:30px;
+    flex-wrap:wrap;
+  }
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(16,38,42,.45);display:none;
+    align-items:center;justify-content:center;z-index:9999;padding:20px;
+  }
+  .modal-overlay.active{display:flex;}
+  .modal{
+    background:#fff;border-radius:var(--radius);width:100%;max-width:600px;
+    max-height:85vh;display:flex;flex-direction:column;
+  }
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h3{margin:0;font-size:14.5px;}
+  .modal-body{padding:14px 20px;overflow-y:auto;}
+  .modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+  
+  .list-pick-item{
+    display:flex;justify-content:space-between;align-items:center;padding:12px 14px;
+    border-bottom:1px solid var(--border);cursor:pointer;border-radius:4px;
+  }
+  .list-pick-item:hover{background:var(--brand-tint);}
+  .list-pick-item .name{font-size:13.5px;font-weight:600;}
+  .list-pick-item .meta{font-size:12px;color:var(--muted);margin-top:3px;}
+  .list-pick-item .add-tag{font-size:12px;color:var(--brand);font-weight:600;}
+
+  .toast{
+    position:fixed;bottom:22px;right:22px;background:var(--ink);color:#fff;
+    padding:11px 18px;border-radius:6px;font-size:13px;z-index:10000;
+    opacity:0;transform:translateY(8px);transition:opacity .18s,transform .18s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.err{background:var(--rejected);}
+
+
+  /* V2.1 quotation-first editor layout */
+  #panel-editor{max-width:1180px;margin:0 auto;}
+  #panel-editor .quote-editor-hero{background:linear-gradient(120deg,#123d46,#17645f);color:white;border-radius:12px;padding:23px 28px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:20px;box-shadow:0 8px 22px rgba(10,54,57,.12);}
+  #panel-editor .quote-editor-hero .eyebrow{font-size:11px;letter-spacing:1.8px;opacity:.8;margin-bottom:6px;}
+  #panel-editor .quote-editor-hero .headline{font-size:23px;font-weight:750;line-height:1.3;}
+  #panel-editor .quote-editor-hero .subline{font-size:12px;opacity:.82;margin-top:7px;}
+  #panel-editor .quote-editor-hero .hero-total{text-align:right;white-space:nowrap;}
+  #panel-editor .quote-editor-hero .hero-total .caption{font-size:12px;opacity:.85;}
+  #panel-editor .quote-editor-hero .hero-total strong{display:block;font-size:29px;font-weight:750;letter-spacing:.3px;margin-top:4px;}
+  #panel-editor .card{border-radius:11px;box-shadow:0 2px 12px rgba(15,45,50,.045);border:1px solid #e2e9e8;margin-bottom:18px;padding:24px 27px;}
+  #panel-editor .card h2{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:17px;letter-spacing:.2px;border-bottom:1px solid #e7edeb;padding-bottom:15px;margin-bottom:19px;}
+  #panel-editor .editor-step{display:inline-flex;align-items:center;justify-content:center;width:27px;height:27px;border-radius:8px;background:#e7f3f0;color:#17645f;font-size:13px;font-weight:750;margin-right:9px;flex:none;}
+  #panel-editor .editor-heading-label{display:flex;align-items:center;min-width:0;}
+  #panel-editor .editor-helper{font-size:12px;color:#647c80;margin:-8px 0 16px;}
+  #panel-editor .field input:focus,#panel-editor .field select:focus,#panel-editor .field textarea:focus{outline:2px solid rgba(21,109,100,.18);border-color:#18746c;}
+  #panel-editor .items-table th{white-space:nowrap;background:#edf5f3;color:#234d4b;font-size:12px;}
+  #panel-editor .items-table td{vertical-align:middle;}
+  #panel-editor .totals{margin-top:20px;border-top:1px solid #e3eae8;padding-top:12px;}
+  #panel-editor .totals .grand{color:#0d645c;}
+  #panel-editor .panel-actions{position:sticky;bottom:0;z-index:30;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border:1px solid #dfe9e6;border-radius:10px;padding:13px 16px;box-shadow:0 -5px 25px rgba(12,50,50,.07);}
+  @media(max-width:760px){
+   #panel-editor .quote-editor-hero{padding:18px;flex-direction:column;align-items:flex-start;}
+   #panel-editor .quote-editor-hero .hero-total{text-align:left;}
+   #panel-editor .card{padding:18px 15px;}
+   #panel-editor .card h2{flex-wrap:wrap;}
+   #panel-editor .panel-actions{position:static;}
+  }
+
+  #printArea{display:none;}
+  @media print{
+    @page{size:A4 portrait;margin:12mm 14mm;}
+    #printArea{box-sizing:border-box;}
+
+    html, body{overflow:visible !important;height:auto !important;}
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:static;width:100%;padding:0;}
+    .p-head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid var(--brand);padding-bottom:14px;margin-bottom:18px;}
+    .p-logo-wrap{display:flex;align-items:center;gap:14px;}
+    .p-logo-wrap img{width:56px;height:56px;object-fit:contain;}
+    .p-head h1{font-size:19px;margin:0 0 4px;color:var(--brand-dark);}
+    .p-head .co{font-size:11.5px;color:#333;line-height:1.6;}
+    .p-head .qmeta{text-align:right;font-size:12px;line-height:1.7;}
+    .p-head .qmeta .no{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;}
+    .p-client{margin-bottom:16px;font-size:12.5px;line-height:1.8;}
+    .p-client b{font-size:13px;}
+    #printArea table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;}
+    #printArea th{background:var(--brand-tint);color:var(--brand-dark);text-align:left;padding:7px 8px;border:1px solid var(--border);}
+    #printArea td{padding:7px 8px;border:1px solid var(--border);}
+    #printArea .p-totals{width:260px;margin-left:auto;font-size:12.5px;}
+    #printArea .p-totals td{border:none;padding:3px 4px;}
+    #printArea .p-totals .grand{font-weight:700;font-size:14px;border-top:1px solid #333;}
+    .p-notes{margin-top:16px;font-size:11.5px;color:#333;white-space:pre-wrap;line-height:1.7;}
+    #printArea .p-sign{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:18px;border:1px solid #b7c7c5;break-inside:avoid;page-break-inside:avoid;}
+    #printArea .p-sign-cell{box-sizing:border-box;min-width:0;min-height:105px;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;overflow-wrap:anywhere;}
+    #printArea .p-sign-cell+.p-sign-cell{border-left:1px solid #b7c7c5;}
+    #printArea .p-sign-heading{text-align:center;font-size:12px;font-weight:700;padding-bottom:6px;border-bottom:1px solid #dce5e3;}
+    #printArea .p-sign-statement{font-size:10px;line-height:1.5;margin-top:8px;}
+    #printArea .p-sign-bottom{font-size:11px;line-height:1.8;margin-top:auto;}
+    #printArea .p-sign-bottom>div{margin-top:4px;}
+    #printArea .p-head img{object-fit:contain;}
+    #printArea .p-head .p-logo-wrap{min-width:0;flex:1;}
+    #printArea .p-head .qmeta{flex:0 0 36%;min-width:0;}
+    #printArea thead{display:table-header-group;}
+    #printArea tr{break-inside:avoid;page-break-inside:avoid;}
+    #printArea .p-totals{break-inside:avoid;page-break-inside:avoid;}
+    #printArea .p-head{border-bottom-color:var(--pdf-brand,#0F625E);}
+
+  }
+
+  @media (max-width:820px){
+    .sidebar{width:64px;}
+    .sidebar .brand .title,.sidebar .brand .sub,.nav-item span.label,.user-chip{display:none;}
+    .grid2,.grid3{grid-template-columns:1fr;}
+    .content{padding:16px;}
+    .items-table{display:block;overflow-x:auto;}
+  }
+</style>
+</head>
+<body>
+
+<!-- 1) 連線設定 -->
+<div id="setupScreen" class="center-screen" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" class="logo-img" alt="USIS">
+      <div>
+        <div class="title">USIS 報價單系統</div>
+        <div class="sub">首次使用 — 連接 Supabase</div>
+      </div>
+    </div>
+    <div id="setupError"></div>
+    <div class="field">
+      <label>Supabase Project URL</label>
+      <input type="text" id="setupUrl" placeholder="https://xxxx.supabase.co">
+    </div>
+    <div class="field">
+      <label>Supabase Anon Public Key</label>
+      <input type="text" id="setupKey" placeholder="eyJhbGciOi...">
+    </div>
+    <button class="btn btn-primary" onclick="saveConnection()" style="width:100%;">儲存並連線</button>
+    <div class="hint">這組設定只會存在瀏覽器（localStorage），不會外流。</div>
+  </div>
+</div>
+
+<!-- 2) 登入畫面 -->
+<div id="loginScreen" class="center-screen" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" class="logo-img" alt="USIS">
+      <div>
+        <div class="title">USIS 報價單系統</div>
+        <div class="sub">請登入以繼續</div>
+      </div>
+    </div>
+    <div id="loginError"></div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>密碼</label>
+      <input type="password" id="loginPassword" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" onclick="doLogin()" id="loginBtn" style="width:100%;">登入</button>
+    <div class="hint">尚未有帳號？請洽系統管理員建立。</div>
+  </div>
+</div>
+
+<!-- 3) 主系統 -->
+<div id="app">
+<div class="shell">
+  <div class="sidebar">
+    <div class="brand">
+      <img src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" class="logo-img" alt="USIS">
+      <div>
+        <div class="title">USIS 報價單</div>
+        <div class="sub">Quotation System</div>
+      </div>
+    </div>
+    <button class="nav-item active" data-panel="panel-editor" onclick="switchPanel('panel-editor')"><span class="label">新增報價單</span></button>
+    <button class="nav-item" data-panel="panel-list" onclick="switchPanel('panel-list')"><span class="label">報價單列表</span></button>
+    <button class="nav-item" data-panel="panel-clients" onclick="switchPanel('panel-clients')"><span class="label">客戶資料管理</span></button>
+    <button class="nav-item" data-panel="panel-catalog" onclick="switchPanel('panel-catalog')"><span class="label">服務項目管理</span></button>
+    <button class="nav-item" data-panel="panel-templates" onclick="switchPanel('panel-templates')"><span class="label">條款範本管理</span></button>
+    <button class="nav-item" data-panel="panel-settings" onclick="switchPanel('panel-settings')"><span class="label">設定</span></button>
+    <div class="sidebar-foot">
+      <div class="user-chip">
+        <div id="userEmail">-</div>
+        <span class="role" id="userRole">一般人員</span>
+      </div>
+      <button class="nav-item" onclick="openPasswordModal()"><span class="label">修改密碼</span></button>
+      <button class="nav-item" onclick="doLogout()"><span class="label">登出</span></button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">新增報價單</h1>
+        <div class="desc" id="pageDesc">建立報價單並存檔</div>
+      </div>
+      <div id="topbarActions"></div>
+    </div>
+
+    <div class="content">
+
+      <!-- 1. 新增／編輯報價單 -->
+      <div class="panel active" id="panel-editor">
+        <div class="quote-editor-hero">
+          <div>
+            <div class="eyebrow">USIS · QUOTATION WORKSPACE</div>
+            <div class="headline">企業正式報價單</div>
+            <div class="subline">依照正式 PDF 順序填寫：報價資訊 → 客戶 → 服務 → 金額 → 條款</div>
+          </div>
+          <div class="hero-total"><div class="caption">目前報價總額（含稅）</div><strong id="editorHeroTotal">NT$0</strong></div>
+        </div>
+        <div id="lockedBanner" class="locked-banner" style="display:none;">
+          <span>🔒 此報價單狀態為「已接受」，已鎖定無法編輯。如需修改請先解鎖。</span>
+          <button class="btn btn-sm btn-line" onclick="unlockQuote()">解鎖</button>
+        </div>
+
+        <div class="card">
+          <h2><span class="editor-heading-label"><span class="editor-step">01</span>報價單資訊 <span class="n" id="quoteNoDisplay" style="margin-left:10px">自動產生</span></span></h2>
+          <div class="grid3">
+            <div class="field"><label>開立日期</label><input type="date" id="f_issue_date"></div>
+            <div class="field"><label>有效期限</label><input type="date" id="f_valid_until"></div>
+            <div class="field"><label>業務負責人（自動帶入）</label><input type="text" id="f_sales_rep" placeholder="填寫業務姓名"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>
+            <span class="editor-heading-label"><span class="editor-step">02</span>客戶資訊</span>
+            <button class="btn btn-line btn-sm" onclick="openClientPicker()">+ 從既有客戶帶入</button>
+          </h2>
+          <div class="grid2">
+            <div class="field"><label>客戶公司名稱 *</label><input type="text" id="f_client_name" placeholder="請輸入客戶公司全銜"></div>
+            <div class="field"><label>聯絡人</label><input type="text" id="f_contact_person"></div>
+            <div class="field"><label>統一編號</label><input type="text" id="f_tax_id"></div>
+            <div class="field"><label>電話</label><input type="text" id="f_phone"></div>
+            <div class="field" style="grid-column:1/-1;"><label>地址</label><input type="text" id="f_address"></div>
+            <div class="field"><label>Email</label><input type="email" id="f_email"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="editor-heading-label"><span class="editor-step">03</span>服務項目與金額</span></h2><div class="editor-helper">可直接編輯項目、規格、數量與單價；贈送項目不計入應付金額。</div>
+          <div style="overflow-x:auto;width:100%;"><table class="items-table">
+            <thead>
+              <tr>
+                <th>類別</th>
+                <th>項目名稱</th>
+                <th>說明</th>
+                <th>單位</th>
+                <th style="text-align:right;">數量</th>
+                <th style="text-align:right;">單價</th>
+                <th>贈送</th>
+                <th style="text-align:right;">小計</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+          </table></div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-line btn-sm" onclick="addItemRow()">+ 新增空白項目</button>
+            <button class="btn btn-line btn-sm" onclick="openCatalogPicker()">+ 從服務目錄新增</button>
+          </div>
+
+          <div class="totals">
+            <table>
+              <tr><td class="label">小計</td><td class="amount num" id="t_subtotal">$0</td></tr>
+              <tr>
+                <td class="label">稅額（<input type="number" id="f_tax_rate" value="5" style="width:46px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;" onchange="recalcTotals()">%）</td>
+                <td class="amount num" id="t_tax">$0</td>
+              </tr>
+              <tr class="grand"><td>總計</td><td class="amount num" id="t_total">$0</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select></div>
+          <div class="field" style="margin-bottom:0;">
+            <textarea id="f_notes" rows="5"></textarea>
+          </div>
+          <div class="grid2" style="margin-top:14px;">
+            <div class="field" style="margin-bottom:0;">
+              <label>狀態</label>
+              <select id="f_status">
+                <option value="draft">草稿</option>
+                <option value="sent">已送出</option>
+                <option value="accepted">已接受</option>
+                <option value="rejected">已拒絕</option>
+                <option value="expired">已過期</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="saveBtn" onclick="saveQuotation()">儲存報價單</button>
+          <button class="btn btn-line" onclick="saveAsNew()">另存新報價單</button>
+          <button class="btn btn-line" onclick="printQuotation()">列印／匯出 PDF</button>
+          <button class="btn btn-line" onclick="resetEditor()">清空重新填寫</button>
+          <button class="btn btn-danger" id="deleteBtn" onclick="deleteQuotation()" style="display:none;">刪除</button>
+        </div>
+      </div>
+
+      <!-- 2. 報價單列表 -->
+      <div class="panel" id="panel-list">
+        <div class="toolbar">
+          <input type="text" id="searchInput" placeholder="搜尋客戶名稱或編號..." oninput="renderList()">
+          <select id="filterStatus" onchange="renderList()">
+            <option value="">所有狀態</option>
+            <option value="draft">草稿</option>
+            <option value="sent">已送出</option>
+            <option value="accepted">已接受</option>
+            <option value="rejected">已拒絕</option>
+            <option value="expired">已過期</option>
+          </select>
+          <div class="spacer"></div>
+          <button class="btn btn-line btn-sm" onclick="loadQuotations()">↻ 重新整理</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <table id="listTable">
+            <thead>
+              <tr><th>編號</th><th>客戶</th><th>開立日期</th><th>總金額</th><th>狀態</th><th style="width:170px;">動作</th></tr>
+            </thead>
+            <tbody id="listBody"></tbody>
+          </table>
+          <div class="empty-state" id="listEmpty" style="display:none;">目前沒有符合條件的報價單</div>
+        </div>
+      </div>
+
+      <!-- 3. 客戶資料管理 -->
+      <div class="panel" id="panel-clients">
+        <div class="card">
+          <h2>新增客戶資料（全員皆可建立）</h2>
+          <div class="grid3">
+            <div class="field"><label>客戶公司名稱 *</label><input type="text" id="cli_name"></div>
+            <div class="field"><label>聯絡人</label><input type="text" id="cli_contact"></div>
+            <div class="field"><label>統一編號</label><div style="display:flex;gap:8px;align-items:center;"><input type="text" id="cli_tax" inputmode="numeric" maxlength="8" placeholder="8 碼統編" style="min-width:0;flex:1;"><button type="button" class="btn btn-line btn-sm" id="cliLookupBtn" onclick="lookupCompanyByTaxId()" style="white-space:nowrap;flex:none;">查詢公司</button></div><div class="hint" id="cliLookupStatus" role="status" aria-live="polite">查詢經濟部公司登記資料，結果可自行修改。</div></div>
+          </div>
+          <div class="grid3">
+            <div class="field"><label>電話</label><input type="text" id="cli_phone"></div>
+            <div class="field"><label>Email</label><input type="email" id="cli_email"></div>
+            <div class="field"><label>地址</label><input type="text" id="cli_address"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addNewClient()">建立客戶</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <div style="padding:14px 18px 0;">
+            <input type="text" id="cli_search" placeholder="搜尋客戶名稱、統編或聯絡人..." oninput="renderClientsList()" style="width:280px;padding:7px 10px;border:1px solid var(--border);border-radius:5px;">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>公司名稱</th>
+                <th>聯絡人</th>
+                <th>統編</th>
+                <th>電話</th>
+                <th>Email</th>
+                <th style="width:160px;text-align:center;">動作</th>
+              </tr>
+            </thead>
+            <tbody id="clientsBody"></tbody>
+          </table>
+          <div class="empty-state" id="clientsEmpty" style="display:none;">目前尚無客戶資料</div>
+        </div>
+      </div>
+
+      <!-- 4. 服務項目管理（管理員與業務經理專屬編輯） -->
+      <div class="panel" id="panel-catalog">
+        <div class="card" id="adminCatalogCard" style="display:none;">
+          <h2>新增服務項目</h2>
+          <div class="grid3">
+            <div class="field">
+              <label>類別</label>
+              <select id="c_category">
+                <option>ISO驗證</option>
+                <option>資安服務</option>
+                <option>個人資料保護</option>
+                <option>法規與標準</option>
+                <option>其他</option>
+              </select>
+            </div>
+            <div class="field"><label>項目名稱</label><input type="text" id="c_name"></div>
+            <div class="field"><label>單位</label><input type="text" id="c_unit" value="式"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>說明（標準代號等）</label><input type="text" id="c_desc"></div>
+            <div class="field"><label>參考單價</label><input type="number" id="c_price" value="0"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addCatalogItem()">新增到目錄</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:140px;">類別</th>
+                <th style="width:28%;">項目名稱</th>
+                <th>說明</th>
+                <th style="width:70px;">單位</th>
+                <th style="width:120px;text-align:right;">參考單價</th>
+                <th id="th_catalog_action" style="width:120px;text-align:center;display:none;">動作</th>
+              </tr>
+            </thead>
+            <tbody id="catalogBody"></tbody>
+          </table>
+          <div class="empty-state" id="catalogEmpty" style="display:none;">目錄目前是空的</div>
+        </div>
+      </div>
+
+      <!-- 條款範本管理 -->
+      <div class="panel" id="panel-templates">
+        <div class="card" id="templateEditCard" style="display:none;">
+          <h2 id="templateFormTitle">新增條款範本</h2>
+          <input type="hidden" id="template_edit_id">
+          <div class="field"><label>範本名稱 *</label><input id="template_name" type="text" placeholder="例如：ISO 驗證方案"></div>
+          <div class="field" style="margin-top:12px;"><label>條款內容 *</label><textarea id="template_content" rows="6" placeholder="輸入報價條款"></textarea></div>
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:12px 0;">
+            <label><input type="checkbox" id="template_active" checked> 啟用範本</label>
+            <label><input type="checkbox" id="template_default"> 設為預設範本</label>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="saveNoteTemplate()">儲存範本</button>
+            <button class="btn btn-line btn-sm" onclick="resetNoteTemplateForm()">取消編輯</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow-x:auto;">
+          <table><thead><tr><th>範本名稱</th><th>條款內容預覽</th><th>狀態</th><th>預設</th><th style="width:150px;">操作</th></tr></thead>
+          <tbody id="templatesBody"></tbody></table>
+          <div class="empty-state" id="templatesEmpty" style="display:none;">尚無條款範本，管理員或經理可在上方新增。</div>
+        </div>
+      </div>
+
+      <!-- 5. 設定（子項目 Tabs 架構） -->
+      <div class="panel" id="panel-settings">
+        <div class="settings-tabs">
+          <button class="tab-btn active" onclick="switchSettingsTab('tab-profile')">👤 個人業務資料</button>
+          <button class="tab-btn" onclick="switchSettingsTab('tab-company')">🏢 公司資訊</button>
+          <button class="tab-btn" onclick="switchSettingsTab('tab-pdf')">報價單版型</button>
+          <button class="tab-btn" id="tab-btn-users" onclick="switchSettingsTab('tab-users')" style="display:none;">👥 成員帳號管理</button>
+          <button class="tab-btn" id="tab-btn-conn" onclick="switchSettingsTab('tab-conn')" style="display:none;">🔌 連線設定</button>
+        </div>
+
+        <!-- 子項目 1：個人業務資料 -->
+        <div class="settings-subpanel active" id="tab-profile">
+          <div class="card">
+            <h2>個人業務資料設定</h2>
+            <div class="hint" style="margin-bottom:12px;">設定你的業務姓名，建立新報價單時將會自動填入「業務負責人」。</div>
+            <div class="grid2">
+              <div class="field"><label>業務姓名／顯示名稱</label><input type="text" id="my_display_name" placeholder="例如：郭楚葳 Willy"></div>
+              <div class="field"><label>業務電話 / 手機</label><input type="text" id="my_phone" placeholder="例如：0912-345-678"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="saveProfileBtn" onclick="savePersonalProfile()">儲存個人資料</button>
+          </div>
+        </div>
+
+        <!-- 子項目 2：公司資訊 -->
+        <div class="settings-subpanel" id="tab-company">
+          <div class="card">
+            <h2>公司資訊（列印於報價單上）</h2>
+            <div id="settingsAdminHint" class="hint" style="margin-bottom:12px;"></div>
+            <div class="grid2">
+              <div class="field"><label>公司名稱</label><input type="text" id="s_company_name"></div>
+              <div class="field"><label>統一編號</label><input type="text" id="s_tax_id"></div>
+              <div class="field" style="grid-column:1/-1;"><label>地址</label><input type="text" id="s_address"></div>
+              <div class="field"><label>電話</label><input type="text" id="s_phone"></div>
+              <div class="field"><label>報價單編號前綴</label><input type="text" id="s_prefix"></div>
+              <div class="field" style="grid-column:1/-1;"><label>匯款資訊</label><input type="text" id="s_bank"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="settingsSaveBtn" onclick="saveCompanySettings()">儲存設定</button>
+          </div>
+        </div>
+
+        <!-- PDF layout settings (admin write; all signed-in users read) -->
+        <div class="settings-subpanel" id="tab-pdf">
+          <div class="card">
+            <h2>報價單 PDF 版型設定</h2>
+            <div id="pdfSettingsHint" class="hint" style="margin-bottom:14px;">公司名稱沿用「公司資訊」設定；此處可自訂其他 PDF 標題與簽章文字。</div>
+            <div class="grid2">
+              <div class="field"><label>公司英文名稱（留空不顯示）</label><input id="pdf_company_name_en"></div>
+              <div class="field"><label>中文文件標題</label><input id="pdf_document_title"></div>
+              <div class="field"><label>英文文件標題（留空不顯示）</label><input id="pdf_document_title_en"></div>
+              <div class="field"><label>品牌主色</label><input id="pdf_brand_color" type="color" value="#0f625e" style="height:40px"></div>
+              <div class="field"><label>客戶確認欄標題</label><input id="pdf_client_sign_title"></div>
+              <div class="field"><label>報價確認欄標題</label><input id="pdf_quote_sign_title"></div>
+              <div class="field"><label>客戶簽章文字</label><input id="pdf_client_sign_label"></div>
+              <div class="field"><label>報價方簽章文字</label><input id="pdf_quote_sign_label"></div>
+              <div class="field"><label>主管簽核文字</label><input id="pdf_approval_label"></div>
+              <div class="field"><label>LOGO 大小</label><select id="pdf_logo_size"><option value="small">小</option><option value="medium">中</option><option value="large">大</option></select></div>
+              <div class="field" style="grid-column:1/-1;"><label>客戶簽回聲明</label><textarea id="pdf_client_confirm_text" rows="2"></textarea></div>
+              <div class="field" style="grid-column:1/-1;">
+                <label>公司 LOGO（PNG / JPG / WebP，最多 2MB）</label>
+                <input id="pdf_logo_upload" type="file" accept="image/png,image/jpeg,image/webp">
+                <div style="margin-top:8px;display:flex;gap:12px;align-items:center"><img id="pdf_logo_preview" alt="LOGO 預覽" style="max-width:90px;max-height:65px;object-fit:contain;display:none"><span id="pdf_logo_status" class="hint"></span></div>
+              </div>
+            </div>
+            <button id="pdfSaveBtn" class="btn btn-primary btn-sm" onclick="savePdfSettings()">儲存 PDF 版型設定</button>
+          </div>
+        </div>
+        <!-- 子項目 3：成員帳號管理（僅管理員顯示） -->
+        <div class="settings-subpanel" id="tab-users">
+          <div class="card">
+            <h2>新增成員帳號</h2>
+            <div class="hint" style="margin-bottom:12px;">直接為公司內部成員開立帳號與初始密碼，建立後成員即可登入。</div>
+            <div class="grid3">
+              <div class="field">
+                <label>成員 Email *</label>
+                <input type="email" id="new_user_email" placeholder="user@usis.com.tw">
+              </div>
+              <div class="field">
+                <label>初始密碼 *（至少 6 碼）</label>
+                <input type="password" id="new_user_password" placeholder="請設定登入密碼">
+              </div>
+              <div class="field">
+                <label>系統身分</label>
+                <select id="new_user_role">
+                  <option value="staff">業務人員</option>
+                  <option value="manager">業務經理</option>
+                  <option value="admin">系統管理員</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="createUserBtn" onclick="createAccountByAdmin()">建立使用者</button>
+          </div>
+          <div class="card" style="padding:0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>帳號 (Email)</th>
+                  <th>姓名 / 顯示名稱</th>
+                  <th>業務電話</th>
+                  <th>系統權限</th>
+                </tr>
+              </thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+            <div class="empty-state" id="usersEmpty" style="display:none;">目前尚無成員列表資料</div>
+          </div>
+        </div>
+
+        <!-- 子項目 4：連線設定（僅管理員顯示） -->
+        <div class="settings-subpanel" id="tab-conn">
+          <div class="card">
+            <h2>連線設定</h2>
+            <div class="field"><label>Supabase URL</label><input type="text" id="conn_url" readonly></div>
+            <button class="btn btn-line btn-sm" onclick="showSetup()">重新設定連線</button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- 客戶挑選 modal -->
+<div class="modal-overlay" id="clientModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>從客戶資料庫帶入</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeClientPicker()">✕</button>
+    </div>
+    <div style="padding:10px 20px 0;">
+      <input type="text" id="clientPickerSearch" placeholder="快速搜尋公司名稱或統編..." oninput="renderClientPickerList()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:5px;">
+    </div>
+    <div class="modal-body" id="clientPickerList"></div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closeClientPicker()">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- 客戶編輯 modal（管理員 / 業務經理） -->
+<div class="modal-overlay" id="clientEditModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>編輯客戶資料</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeClientEditor()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit_cli_id">
+      <div class="field">
+        <label>客戶公司名稱 *</label>
+        <input type="text" id="edit_cli_name">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>聯絡人</label>
+          <input type="text" id="edit_cli_contact">
+        </div>
+        <div class="field">
+          <label>統一編號</label>
+          <input type="text" id="edit_cli_tax">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>電話</label>
+          <input type="text" id="edit_cli_phone">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="edit_cli_email">
+        </div>
+      </div>
+      <div class="field">
+        <label>地址</label>
+        <input type="text" id="edit_cli_address">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closeClientEditor()">取消</button>
+      <button class="btn btn-primary btn-sm" id="editClientSaveBtn" onclick="saveClientEdit()">儲存客戶變更</button>
+    </div>
+  </div>
+</div>
+
+<!-- 服務目錄挑選 modal -->
+<div class="modal-overlay" id="catalogModal">
+  <div class="modal">
+    <div class="modal-head"><h3>從服務目錄選擇項目</h3><button class="btn btn-ghost btn-sm" onclick="closeCatalogPicker()">✕</button></div>
+    <div class="modal-body" id="catalogPickerList"></div>
+    <div class="modal-foot"><button class="btn btn-line btn-sm" onclick="closeCatalogPicker()">關閉</button></div>
+  </div>
+</div>
+
+<!-- 服務目錄編輯 modal（管理員 / 業務經理） -->
+<div class="modal-overlay" id="catalogEditModal">
+  <div class="modal">
+    <div class="modal-head"><h3>編輯服務項目</h3><button class="btn btn-ghost btn-sm" onclick="closeCatalogEditor()">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit_c_id">
+      <div class="field">
+        <label>類別</label>
+        <select id="edit_c_category">
+          <option>ISO驗證</option>
+          <option>資安服務</option>
+          <option>個人資料保護</option>
+          <option>法規與標準</option>
+          <option>其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>項目名稱 *</label>
+        <input type="text" id="edit_c_name">
+      </div>
+      <div class="field">
+        <label>說明（標準代號等）</label>
+        <input type="text" id="edit_c_desc">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>單位</label>
+          <input type="text" id="edit_c_unit">
+        </div>
+        <div class="field">
+          <label>參考單價</label>
+          <input type="number" id="edit_c_price">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closeCatalogEditor()">取消</button>
+      <button class="btn btn-primary btn-sm" id="editCatalogSaveBtn" onclick="saveCatalogEdit()">儲存變更</button>
+    </div>
+  </div>
+</div>
+
+<!-- 個人修改密碼 modal -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal">
+    <div class="modal-head"><h3>修改個人登入密碼</h3><button class="btn btn-ghost btn-sm" onclick="closePasswordModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>新密碼（至少 6 碼）</label>
+        <input type="password" id="user_new_password" placeholder="請輸入新密碼">
+      </div>
+      <div class="field">
+        <label>再次輸入新密碼</label>
+        <input type="password" id="user_confirm_password" placeholder="請確認新密碼">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-line btn-sm" onclick="closePasswordModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="savePasswordBtn" onclick="updateOwnPassword()">確認變更</button>
+    </div>
+  </div>
+</div>
+
+<!-- 列印用內容 -->
+<div id="printArea">
+  <div class="p-head" id="pdfHeader">
+    <div class="p-logo-wrap">
+      <img id="p_logo" src="https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png" alt="公司 LOGO">
+      <div>
+        <h1 id="p_company_name">優士國際資安股份有限公司</h1><div class="co" id="p_company_en"></div>
+        <div class="co" id="p_company_meta"></div>
+      </div>
+    </div>
+    <div class="qmeta">
+      <div id="p_doc_title">報 價 單</div><div id="p_doc_title_en"></div>
+      <div class="no" id="p_quote_no"></div>
+      <div id="p_dates"></div>
+    </div>
+  </div>
+  <div class="p-client" id="p_client"></div>
+  <table>
+    <thead><tr><th>項目</th><th>說明</th><th>單位</th><th>數量</th><th>單價</th><th>小計</th></tr></thead>
+    <tbody id="p_items"></tbody>
+  </table>
+  <table class="p-totals">
+    <tr><td>小計</td><td style="text-align:right;" id="p_subtotal"></td></tr>
+    <tr><td id="p_tax_label">稅額</td><td style="text-align:right;" id="p_tax"></td></tr>
+    <tr class="grand"><td>總計</td><td style="text-align:right;" id="p_total"></td></tr>
+  </table>
+  <div class="p-notes" id="p_notes"></div>
+  <div class="p-sign">
+    <div class="p-sign-cell">
+      <div class="p-sign-heading" id="p_client_sign_title"></div>
+      <div class="p-sign-statement" id="p_client_confirm_text"></div>
+      <div class="p-sign-bottom" id="p_client_sign_label"></div>
+    </div>
+    <div class="p-sign-cell">
+      <div class="p-sign-heading" id="p_quote_sign_title"></div>
+      <div class="p-sign-bottom"><div id="p_quote_sign_label"></div><div id="p_approval_label"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 狀態與初始化 ================= */
+const DEFAULT_SB_URL = 'https://jkhdalsqdjugcweepvmt.supabase.co';
+const DEFAULT_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpraGRhbHNxZGp1Z2N3ZWVwdm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5ODc4MDcsImV4cCI6MjEwNDU2MzgwN30.ryURSFwu5gEYwk0gqvFgdP-fP-7jlN3ReH37CbzKW8o';
+
+const ADMIN_EMAILS = ['willy.k@usis.com.tw'];
+
+const DEFAULT_CATALOG = [
+  { category:'ISO驗證', item_name:'資訊安全管理系統', description:'ISO/IEC 27001 · ISMS', unit:'式', default_price:0 },
+  { category:'個人資料保護', item_name:'隱私資訊管理系統', description:'ISO/IEC 27701 · PIMS', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'人工智慧管理系統', description:'ISO/IEC 42001 · AIMS', unit:'式', default_price:0 },
+  { category:'法規與標準', item_name:'歐盟網路韌性法案', description:'Cyber Resilience Act · CRA', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'雲端服務資訊安全', description:'ISO/IEC 27017', unit:'式', default_price:0 },
+  { category:'個人資料保護', item_name:'雲端服務個人資料保護', description:'ISO/IEC 27018', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'資訊科技服務管理系統', description:'ISO/IEC 20000 · ITSMS', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'營運持續管理系統', description:'ISO 22301 · BCMS', unit:'式', default_price:0 },
+  { category:'ISO驗證', item_name:'實驗室品質管理系統', description:'ISO/IEC 17025', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'資訊技術安全評估準則', description:'ISO/IEC 15408 · CC', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'密碼模組安全需求', description:'ISO 19790 · FIPS 140-3', unit:'式', default_price:0 },
+  { category:'資安服務', item_name:'工控資安防護', description:'IEC 62443-2-1', unit:'式', default_price:0 }
+];
+
+let sb = null;
+let currentUser = null;
+let currentProfile = null;
+let companySettings = { company_name:'優士國際資安股份有限公司', address:'', phone:'', tax_id:'', bank_info:'', default_tax_rate:5, quote_prefix:'QT' };
+let pdfSettings = {
+ company_name_en:'USIS INTERNATIONAL INFORMATION SECURITY', document_title:'報 價 單',document_title_en:'QUOTATION',
+ client_sign_title:'客戶訂購確認欄',quote_sign_title:'報價確認欄',
+ client_sign_label:'承辦人簽章：',quote_sign_label:'承辦人簽章：',approval_label:'主管簽核：',
+ client_confirm_text:'客戶確認後請加蓋公司章簽回，簽回後即視同正式訂購單。',
+ brand_color:'#0F625E',logo_size:'medium',logo_path:null
+};
+let catalog = [];
+let noteTemplates = [];
+let quotations = [];
+let clients = [];
+let teamProfiles = [];
+let currentQuote = null;
+let itemSeq = 0;
+
+const STATUS_LABEL = { draft:'草稿', sent:'已送出', accepted:'已接受', rejected:'已拒絕', expired:'已過期' };
+const ROLE_LABEL = { admin:'系統管理員', manager:'業務經理', staff:'業務人員' };
+
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(()=> t.className = 'toast', 2400);
+}
+function money(n){ return '$' + Number(n||0).toLocaleString('zh-TW', {maximumFractionDigits:0}); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function plusDays(days){ const d = new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+
+/* ================= 連線設定 ================= */
+function showSetup(){
+  document.getElementById('setupScreen').style.display='flex';
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('app').style.display='none';
+  const url = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
+  const key = localStorage.getItem('usis_sb_key') || DEFAULT_SB_KEY;
+  document.getElementById('setupUrl').value = url;
+  document.getElementById('setupKey').value = key;
+}
+function saveConnection(){
+  const url = document.getElementById('setupUrl').value.trim();
+  const key = document.getElementById('setupKey').value.trim();
+  const errEl = document.getElementById('setupError');
+  errEl.innerHTML = '';
+  if(!url || !key){
+    errEl.innerHTML = '<div class="error-msg">請填入 Supabase URL 與 Anon Key</div>';
+    return;
+  }
+  localStorage.setItem('usis_sb_url', url);
+  localStorage.setItem('usis_sb_key', key);
+  initSupabase();
+}
+
+function initSupabase(){
+  const url = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
+  const key = localStorage.getItem('usis_sb_key') || DEFAULT_SB_KEY;
+  if(!url || !key){ showSetup(); return; }
+  try{
+    sb = window.supabase.createClient(url, key);
+  }catch(e){
+    showSetup();
+    document.getElementById('setupError').innerHTML = '<div class="error-msg">連線失敗，請確認網址與 Key 是否正確</div>';
+    return;
+  }
+  document.getElementById('setupScreen').style.display='none';
+  checkSession();
+}
+
+async function checkSession(){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session && session.user){
+      currentUser = session.user;
+      await afterLogin();
+    }else{
+      document.getElementById('loginScreen').style.display='flex';
+      document.getElementById('app').style.display='none';
+    }
+  }catch(e){
+    console.error('Session check error:', e);
+    document.getElementById('loginScreen').style.display='flex';
+  }
+}
+
+/* ================= 登入 / 登出 ================= */
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  errEl.innerHTML = '';
+  if(!email || !password){
+    errEl.innerHTML = '<div class="error-msg">請輸入 Email 與密碼</div>';
+    return;
+  }
+  btn.disabled = true; btn.textContent = '登入中...';
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){
+      errEl.innerHTML = '<div class="error-msg">登入失敗：帳號或密碼錯誤</div>';
+      return;
+    }
+    currentUser = data.user;
+    await afterLogin();
+  }catch(e){
+    errEl.innerHTML = '<div class="error-msg">連線異常：' + e.message + '</div>';
+  }finally{
+    btn.disabled = false; btn.textContent = '登入';
+  }
+}
+
+async function doLogout(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  currentUser = null; currentProfile = null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPassword').value='';
+}
+
+/* 權限核心渲染控制 */
+function updateRoleUI(){
+  const role = currentProfile?.role || 'staff';
+  const isAdmin = (role === 'admin');
+  const isManager = (role === 'manager');
+  const canManageContent = isAdmin || isManager;
+
+  const roleEl = document.getElementById('userRole');
+  if(roleEl){
+    roleEl.textContent = ROLE_LABEL[role] || '業務人員';
+    roleEl.className = 'role ' + role;
+  }
+  const userEmailEl = document.getElementById('userEmail');
+  if(userEmailEl && currentUser){
+    const displayName = currentProfile?.display_name || currentUser.email;
+    userEmailEl.textContent = displayName;
+    userEmailEl.title = currentUser.email;
+  }
+
+  // 1. 設定內的「成員帳號管理」與「連線設定」僅 admin 可看
+  const tabUsersBtn = document.getElementById('tab-btn-users');
+  if(tabUsersBtn) tabUsersBtn.style.display = isAdmin ? 'inline-block' : 'none';
+  const tabConnBtn = document.getElementById('tab-btn-conn');
+  if(tabConnBtn) tabConnBtn.style.display = isAdmin ? 'inline-block' : 'none';
+
+  // 2. 服務項目管理：admin 或 manager 可新增、編輯、刪除；staff 唯讀
+  const adminCatalogCard = document.getElementById('adminCatalogCard');
+  if(adminCatalogCard) adminCatalogCard.style.display = canManageContent ? 'block' : 'none';
+  const thCatalogAction = document.getElementById('th_catalog_action');
+  if(thCatalogAction) thCatalogAction.style.display = canManageContent ? 'table-cell' : 'none';
+}
+
+async function afterLogin(){
+  try{
+    let role = 'staff';
+    let profileData = null;
+    if(ADMIN_EMAILS.includes(currentUser.email?.toLowerCase())){
+      role = 'admin';
+    }
+    try{
+      const { data: pById } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+      if(pById){
+        profileData = pById;
+        if(pById.role) role = pById.role;
+      }
+    }catch(err){
+      console.warn('Profiles query fallback used:', err);
+    }
+
+    currentProfile = { 
+      role, 
+      email: currentUser.email,
+      display_name: profileData?.display_name || '',
+      phone: profileData?.phone || ''
+    };
+
+    document.getElementById('my_display_name').value = currentProfile.display_name;
+    document.getElementById('my_phone').value = currentProfile.phone;
+
+    document.getElementById('conn_url').value = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='block';
+
+    updateRoleUI();
+    applySettingsPermissions();
+
+    await loadCompanySettings();
+    await loadPdfSettings();
+    await loadCatalog();
+    await loadNoteTemplates();
+    await loadQuotations();
+    await loadClients();
+    if(role === 'admin') await loadTeamProfiles();
+    resetEditor();
+  }catch(e){
+    console.error('Fatal load error:', e);
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='block';
+    updateRoleUI();
+  }
+}
+
+function applySettingsPermissions(){
+  updateRoleUI();
+  const isAdmin = currentProfile && currentProfile.role === 'admin';
+  const ids = ['s_company_name','s_tax_id','s_address','s_phone','s_prefix','s_bank'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.disabled = !isAdmin;
+  });
+  document.querySelectorAll('#tab-pdf input,#tab-pdf select,#tab-pdf textarea').forEach(el=>el.disabled=!isAdmin);
+  document.getElementById('pdfSaveBtn').style.display=isAdmin?'inline-flex':'none';
+  document.getElementById('pdfSettingsHint').textContent=isAdmin?'可修改 PDF 的企業識別、標題與簽章文字。':'僅管理員可以修改 PDF 版型設定。';
+  const saveBtn = document.getElementById('settingsSaveBtn');
+  if(saveBtn) saveBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
+  const hintEl = document.getElementById('settingsAdminHint');
+  if(hintEl){
+    hintEl.textContent = isAdmin
+      ? '你是系統管理員，可編輯並儲存公司基本資料。'
+      : '公司資訊僅系統管理員可修改，如需更新請聯絡管理員。';
+  }
+}
+
+/* ================= 個人業務資料設定 ================= */
+async function savePersonalProfile(){
+  const displayName = document.getElementById('my_display_name').value.trim();
+  const phone = document.getElementById('my_phone').value.trim();
+  const btn = document.getElementById('saveProfileBtn');
+
+  btn.disabled = true;
+  btn.textContent = '儲存中...';
+
+  try{
+    const { error } = await sb.from('profiles').update({
+      display_name: displayName,
+      phone: phone
+    }).eq('id', currentUser.id);
+
+    if(error) throw error;
+
+    currentProfile.display_name = displayName;
+    currentProfile.phone = phone;
+
+    localStorage.removeItem('usis_my_name');
+    localStorage.removeItem('usis_my_phone');
+
+    updateRoleUI();
+
+    const salesRepInput = document.getElementById('f_sales_rep');
+    if(salesRepInput){
+      salesRepInput.value = displayName;
+    }
+
+    toast('個人業務資料已成功儲存至資料庫！');
+  }catch(e){
+    console.error('儲存個人資料失敗:', e);
+    toast('儲存失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '儲存個人資料';
+  }
+}
+
+/* ================= 客戶資料庫管理 ================= */
+async function loadClients(){
+  try{
+    const { data, error } = await sb.from('clients').select('*').order('company_name');
+    if(!error && data){
+      clients = data;
+    }
+  }catch(e){
+    console.warn('loadClients error:', e);
+    clients = [];
+  }
+  renderClientsList();
+}
+
+function renderClientsList(){
+  const body = document.getElementById('clientsBody');
+  const empty = document.getElementById('clientsEmpty');
+  const q = (document.getElementById('cli_search')?.value || '').toLowerCase();
+  
+  // 業務經理與管理員擁有編輯/刪除客戶權限；業務人員僅能新增與帶入
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  
+  const filtered = clients.filter(c => 
+    !q || 
+    (c.company_name && c.company_name.toLowerCase().includes(q)) ||
+    (c.tax_id && c.tax_id.includes(q)) ||
+    (c.contact_person && c.contact_person.toLowerCase().includes(q))
+  );
+
+  body.innerHTML = '';
+  empty.style.display = filtered.length ? 'none' : 'block';
+
+  filtered.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${escapeHtml(c.company_name)}</b></td>
+      <td>${escapeHtml(c.contact_person || '-')}</td>
+      <td>${escapeHtml(c.tax_id || '-')}</td>
+      <td>${escapeHtml(c.phone || '-')}</td>
+      <td>${escapeHtml(c.email || '-')}</td>
+      <td style="text-align:center;">
+        <button class="btn btn-ghost btn-sm" onclick="applyClientToEditor('${c.id}')">帶入</button>
+        ${canEditClients ? `
+          <button class="btn btn-ghost btn-sm" onclick="openClientEditor('${c.id}')">編輯</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteClientItem('${c.id}')" style="color:var(--danger);">刪除</button>
+        ` : ''}
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+
+async function lookupCompanyByTaxId(){
+ const tax=document.getElementById('cli_tax').value.trim();
+ const status=document.getElementById('cliLookupStatus');
+ const btn=document.getElementById('cliLookupBtn');
+ if(!/^\d{8}$/.test(tax)){status.textContent='請輸入完整的 8 碼統一編號。';toast('統編格式須為 8 碼數字',true);return;}
+ const existing=clients.find(c=>String(c.tax_id||'').trim()===tax);
+ if(existing){status.textContent='此統編已存在客戶資料庫：'+existing.company_name+'，請勿重複建立。';toast('此統編已存在客戶資料庫',true);return;}
+ btn.disabled=true;btn.textContent='查詢中...';status.textContent='正在向經濟部商工資料 API 查詢...';
+ try{
+  const {data:payload,error:lookupError}=await sb.functions.invoke('company-lookup',{body:{tax_id:tax}});
+  if(lookupError)throw new Error('查詢服務尚未啟用或連線失敗，請確認 Supabase Edge Function company-lookup 已部署');
+  if(payload?.error)throw new Error(payload.error);
+  const company=payload?.company;
+  if(!company){status.textContent='查無此統編的公司登記資料；若為行號或其他組織，請手動輸入。';return;}
+  const name=company.name||'';
+  const address=company.address||'';
+  if(!name&&!address)throw new Error('API 未提供公司名稱或地址欄位');
+  const nameEl=document.getElementById('cli_name'),addrEl=document.getElementById('cli_address');
+  if((nameEl.value.trim()&&nameEl.value.trim()!==name)||(addrEl.value.trim()&&addrEl.value.trim()!==address)){
+   if(!confirm('查詢結果將覆蓋已輸入的公司名稱或地址，確定套用嗎？')){status.textContent='已取消帶入，原資料保留。';return;}
+  }
+  if(name)nameEl.value=name;
+  if(address)addrEl.value=address;
+  status.textContent='已帶入政府公司登記資料；請確認地址是否為實際聯絡地址。';
+  toast('公司資料查詢成功');
+ }catch(e){
+  console.error('公司統編查詢失敗',e);
+  status.textContent='公司查詢服務尚未成功回應，請確認 Edge Function 已部署，或先手動填寫。';
+  toast('查詢失敗：'+e.message,true);
+ }finally{btn.disabled=false;btn.textContent='查詢公司';}
+}
+
+async function addNewClient(){
+  const company_name = document.getElementById('cli_name').value.trim();
+  if(!company_name){
+    toast('請輸入客戶公司名稱', true);
+    return;
+  }
+  const payload = {
+    company_name,
+    contact_person: document.getElementById('cli_contact').value.trim(),
+    tax_id: document.getElementById('cli_tax').value.trim(),
+    phone: document.getElementById('cli_phone').value.trim(),
+    email: document.getElementById('cli_email').value.trim(),
+    address: document.getElementById('cli_address').value.trim()
+  };
+
+  try{
+    const { error } = await sb.from('clients').insert(payload);
+    if(error) throw error;
+    toast('已成功建立客戶！');
+    document.getElementById('cli_name').value = '';
+    document.getElementById('cli_contact').value = '';
+    document.getElementById('cli_tax').value = '';
+    document.getElementById('cli_phone').value = '';
+    document.getElementById('cli_email').value = '';
+    document.getElementById('cli_address').value = '';
+    await loadClients();
+  }catch(e){
+    toast('新增失敗：' + e.message, true);
+  }
+}
+
+function openClientEditor(id){
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canEditClients){
+    toast('權限不足：業務人員不可編輯客戶資料', true);
+    return;
+  }
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  document.getElementById('edit_cli_id').value = c.id;
+  document.getElementById('edit_cli_name').value = c.company_name || '';
+  document.getElementById('edit_cli_contact').value = c.contact_person || '';
+  document.getElementById('edit_cli_tax').value = c.tax_id || '';
+  document.getElementById('edit_cli_phone').value = c.phone || '';
+  document.getElementById('edit_cli_email').value = c.email || '';
+  document.getElementById('edit_cli_address').value = c.address || '';
+  document.getElementById('clientEditModal').classList.add('active');
+}
+
+function closeClientEditor(){
+  document.getElementById('clientEditModal').classList.remove('active');
+}
+
+async function saveClientEdit(){
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canEditClients){
+    toast('權限不足：業務人員不可修改客戶資料', true);
+    return;
+  }
+  const id = document.getElementById('edit_cli_id').value;
+  const company_name = document.getElementById('edit_cli_name').value.trim();
+  if(!company_name){
+    toast('請填寫客戶公司名稱', true);
+    return;
+  }
+  const payload = {
+    company_name,
+    contact_person: document.getElementById('edit_cli_contact').value.trim(),
+    tax_id: document.getElementById('edit_cli_tax').value.trim(),
+    phone: document.getElementById('edit_cli_phone').value.trim(),
+    email: document.getElementById('edit_cli_email').value.trim(),
+    address: document.getElementById('edit_cli_address').value.trim()
+  };
+
+  const btn = document.getElementById('editClientSaveBtn');
+  btn.disabled = true; btn.textContent = '儲存中...';
+
+  try{
+    const { error } = await sb.from('clients').update(payload).eq('id', id);
+    if(error) throw error;
+    toast('客戶資料已更新！');
+    closeClientEditor();
+    await loadClients();
+  }catch(e){
+    toast('更新失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false; btn.textContent = '儲存客戶變更';
+  }
+}
+
+async function deleteClientItem(id){
+  const canEditClients = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canEditClients){
+    toast('權限不足：業務人員不可刪除客戶資料', true);
+    return;
+  }
+  if(!confirm('確定要刪除這筆客戶資料嗎？此動作無法復原。')) return;
+  try{
+    const { error } = await sb.from('clients').delete().eq('id', id);
+    if(error) throw error;
+    toast('已成功刪除客戶');
+    await loadClients();
+  }catch(e){
+    toast('刪除失敗：' + e.message, true);
+  }
+}
+
+function openClientPicker(){
+  document.getElementById('clientPickerSearch').value = '';
+  renderClientPickerList();
+  document.getElementById('clientModal').classList.add('active');
+}
+function closeClientPicker(){
+  document.getElementById('clientModal').classList.remove('active');
+}
+
+function renderClientPickerList(){
+  const list = document.getElementById('clientPickerList');
+  const q = (document.getElementById('clientPickerSearch')?.value || '').toLowerCase();
+  list.innerHTML = '';
+
+  const filtered = clients.filter(c => 
+    !q || 
+    (c.company_name && c.company_name.toLowerCase().includes(q)) ||
+    (c.tax_id && c.tax_id.includes(q)) ||
+    (c.contact_person && c.contact_person.toLowerCase().includes(q))
+  );
+
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="empty-state">查無客戶，可至「客戶資料管理」預先新增</div>';
+    return;
+  }
+
+  filtered.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'list-pick-item';
+    div.innerHTML = `
+      <div>
+        <div class="name">${escapeHtml(c.company_name)}</div>
+        <div class="meta">聯絡人：${escapeHtml(c.contact_person || '-')} · 統編：${escapeHtml(c.tax_id || '-')}</div>
+      </div>
+      <span class="add-tag">帶入 ➔</span>`;
+    div.onclick = () => {
+      document.getElementById('f_client_name').value = c.company_name || '';
+      document.getElementById('f_contact_person').value = c.contact_person || '';
+      document.getElementById('f_tax_id').value = c.tax_id || '';
+      document.getElementById('f_phone').value = c.phone || '';
+      document.getElementById('f_address').value = c.address || '';
+      document.getElementById('f_email').value = c.email || '';
+      closeClientPicker();
+      toast('已自動帶入客戶資料');
+    };
+    list.appendChild(div);
+  });
+}
+
+function applyClientToEditor(id){
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  document.getElementById('f_client_name').value = c.company_name || '';
+  document.getElementById('f_contact_person').value = c.contact_person || '';
+  document.getElementById('f_tax_id').value = c.tax_id || '';
+  document.getElementById('f_phone').value = c.phone || '';
+  document.getElementById('f_address').value = c.address || '';
+  document.getElementById('f_email').value = c.email || '';
+  switchPanel('panel-editor');
+  toast('已將客戶資料帶入報價單');
+}
+
+/* ================= 成員帳號管理（管理員） ================= */
+async function loadTeamProfiles(){
+  try{
+    const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending:false });
+    if(!error && data){
+      teamProfiles = data;
+    }
+  }catch(e){
+    console.warn('loadTeamProfiles error:', e);
+    teamProfiles = [];
+  }
+  renderTeamProfiles();
+}
+
+function renderTeamProfiles(){
+  const body = document.getElementById('usersBody');
+  const empty = document.getElementById('usersEmpty');
+  if(!body) return;
+  body.innerHTML = '';
+  empty.style.display = teamProfiles.length ? 'none' : 'block';
+
+  teamProfiles.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${escapeHtml(u.email || '-')}</b></td>
+      <td>${escapeHtml(u.display_name || '-')}</td>
+      <td>${escapeHtml(u.phone || '-')}</td>
+      <td><span class="badge ${u.role === 'admin' ? 'accepted' : (u.role === 'manager' ? 'sent' : 'draft')}">${ROLE_LABEL[u.role] || '業務人員'}</span></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+async function createAccountByAdmin(){
+  const email = document.getElementById('new_user_email').value.trim();
+  const password = document.getElementById('new_user_password').value;
+  const role = document.getElementById('new_user_role').value;
+  const btn = document.getElementById('createUserBtn');
+
+  if(!email || !password){
+    toast('請填寫 Email 與密碼', true);
+    return;
+  }
+  if(password.length < 6){
+    toast('密碼長度至少需要 6 個字元', true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '建立中...';
+
+  try{
+    const url = localStorage.getItem('usis_sb_url') || DEFAULT_SB_URL;
+    const key = localStorage.getItem('usis_sb_key') || DEFAULT_SB_KEY;
+    const tempSb = window.supabase.createClient(url, key, { auth: { persistSession: false } });
+
+    const { data: authData, error: authErr } = await tempSb.auth.signUp({
+      email,
+      password,
+      options: { 
+        data: { role: role }
+      }
+    });
+
+    if(authErr) throw authErr;
+
+    if(authData.user){
+      await sb.from('profiles').upsert({
+        id: authData.user.id,
+        email: email,
+        display_name: email.split('@')[0],
+        role: role
+      });
+    }
+
+    toast('帳號建立成功！已加入成員列表');
+    document.getElementById('new_user_email').value = '';
+    document.getElementById('new_user_password').value = '';
+    await loadTeamProfiles();
+  }catch(e){
+    toast('建立帳號失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '建立使用者';
+  }
+}
+
+/* ================= 使用者修改個人密碼 ================= */
+function openPasswordModal(){
+  document.getElementById('user_new_password').value = '';
+  document.getElementById('user_confirm_password').value = '';
+  document.getElementById('passwordModal').classList.add('active');
+}
+function closePasswordModal(){
+  document.getElementById('passwordModal').classList.remove('active');
+}
+async function updateOwnPassword(){
+  const pwd = document.getElementById('user_new_password').value;
+  const confirmPwd = document.getElementById('user_confirm_password').value;
+  const btn = document.getElementById('savePasswordBtn');
+
+  if(!pwd || pwd.length < 6){
+    toast('密碼至少需要 6 個字元', true);
+    return;
+  }
+  if(pwd !== confirmPwd){
+    toast('兩次輸入的密碼不一致', true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '更新中...';
+
+  try{
+    const { error } = await sb.auth.updateUser({ password: pwd });
+    if(error) throw error;
+    toast('密碼已成功更新！');
+    closePasswordModal();
+  }catch(e){
+    toast('修改密碼失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '確認變更';
+  }
+}
+
+/* ================= 導覽切換 ================= */
+function switchPanel(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const target = document.getElementById(id);
+  if(target) target.classList.add('active');
+  const nav = document.querySelector(`.nav-item[data-panel="${id}"]`);
+  if(nav) nav.classList.add('active');
+  // 僅捲動主內容區，避免瀏覽器將整個固定版面推離可視範圍
+  document.querySelector('.content')?.scrollTo({top:0,behavior:'instant'});
+  window.scrollTo(0,0);
+
+  const titles = {
+    'panel-editor':['新增報價單','建立報價單並存檔'],
+    'panel-list':['報價單列表','檢視、搜尋與管理已建立的報價單'],
+    'panel-clients':['客戶資料管理','管理內部常用客戶與聯絡資料庫'],
+    'panel-catalog':['服務項目管理','管理可重複使用的服務項目目錄'],
+    'panel-templates':['條款範本管理','建立及管理報價單常用條款'],
+    'panel-settings':['設定','個人業務、公司資訊與成員權限設定'],
+  };
+  if(titles[id]){
+    document.getElementById('pageTitle').textContent = titles[id][0];
+    document.getElementById('pageDesc').textContent = titles[id][1];
+  }
+  updateRoleUI();
+  if(id === 'panel-list') renderList();
+  if(id === 'panel-clients') renderClientsList();
+  if(id === 'panel-catalog') renderCatalog();
+  if(id === 'panel-templates') renderNoteTemplates();
+  if(id === 'panel-settings') {
+    switchSettingsTab('tab-profile');
+  }
+}
+
+function switchSettingsTab(subTabId){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.settings-subpanel').forEach(p => p.classList.remove('active'));
+
+  const tabBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick')?.includes(subTabId));
+  if(tabBtn) tabBtn.classList.add('active');
+
+  const targetSub = document.getElementById(subTabId);
+  if(targetSub) targetSub.classList.add('active');
+
+  if(subTabId === 'tab-users') {
+    loadTeamProfiles();
+  }
+}
+
+/* ================= 公司設定 ================= */
+async function loadCompanySettings(){
+  try{
+    const { data } = await sb.from('company_settings').select('*').eq('id',1).maybeSingle();
+    if(data) companySettings = data;
+  }catch(e){
+    console.warn('loadCompanySettings warning:', e);
+  }
+  document.getElementById('s_company_name').value = companySettings.company_name||'';
+  document.getElementById('s_tax_id').value = companySettings.tax_id||'';
+  document.getElementById('s_address').value = companySettings.address||'';
+  document.getElementById('s_phone').value = companySettings.phone||'';
+  document.getElementById('s_prefix').value = companySettings.quote_prefix||'QT';
+  document.getElementById('s_bank').value = companySettings.bank_info||'';
+  document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
+}
+
+async function saveCompanySettings(){
+  const isAdmin = currentProfile && currentProfile.role === 'admin';
+  if(!isAdmin){
+    toast('權限不足：僅系統管理員可儲存公司資訊', true);
+    return;
+  }
+  const payload = {
+    id:1,
+    company_name: document.getElementById('s_company_name').value.trim(),
+    tax_id: document.getElementById('s_tax_id').value.trim(),
+    address: document.getElementById('s_address').value.trim(),
+    phone: document.getElementById('s_phone').value.trim(),
+    quote_prefix: document.getElementById('s_prefix').value.trim() || 'QT',
+    bank_info: document.getElementById('s_bank').value.trim(),
+  };
+  try{
+    const { error } = await sb.from('company_settings').upsert(payload);
+    if(error) throw error;
+    companySettings = {...companySettings, ...payload};
+    toast('公司設定已儲存');
+  }catch(err){
+    toast('儲存失敗：' + err.message, true);
+  }
+}
+
+/* ================= PDF settings ================= */
+const PDF_FIELDS=['company_name_en','document_title','document_title_en','client_sign_title','quote_sign_title','client_sign_label','quote_sign_label','approval_label','client_confirm_text','brand_color','logo_size'];
+function pdfLogoUrl(){
+ if(!pdfSettings.logo_path)return 'https://usis.com.tw/wp-content/uploads/2026/02/cropped-cropped-cropped-%E7%B4%94%E7%9B%BE%E7%89%8C-1-300x300-optimized.png';
+ return sb.storage.from('usis-pdf-assets').getPublicUrl(pdfSettings.logo_path).data.publicUrl+'?v='+encodeURIComponent(pdfSettings.updated_at||'1');
+}
+function fillPdfSettingsForm(){
+ PDF_FIELDS.forEach(k=>{const el=document.getElementById('pdf_'+k);if(el)el.value=pdfSettings[k]??'';});
+ const img=document.getElementById('pdf_logo_preview');img.src=pdfLogoUrl();img.style.display='block';
+}
+async function loadPdfSettings(){
+ const {data,error}=await sb.from('pdf_settings').select('*').eq('id',1).maybeSingle();
+ if(error){console.warn('PDF settings unavailable until migration is applied:',error.message);return;}
+ if(data)pdfSettings={...pdfSettings,...data};
+ fillPdfSettingsForm();
+}
+async function savePdfSettings(){
+ if(currentProfile?.role!=='admin'){toast('僅管理員可修改 PDF 版型',true);return;}
+ const btn=document.getElementById('pdfSaveBtn');btn.disabled=true;
+ try{
+  const payload={id:1};
+  PDF_FIELDS.forEach(k=>payload[k]=document.getElementById('pdf_'+k).value.trim());
+  if(!/^#[0-9a-fA-F]{6}$/.test(payload.brand_color))throw Error('品牌色格式不正確');
+  const file=document.getElementById('pdf_logo_upload').files[0];
+  if(file){
+   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2097152)throw Error('LOGO 必須是 PNG/JPG/WebP 且不超過 2MB');
+   const ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[file.type];
+   const path='pdf/company-logo-'+Date.now()+'.'+ext;
+   const {error:uploadErr}=await sb.storage.from('usis-pdf-assets').upload(path,file,{contentType:file.type,upsert:false});
+   if(uploadErr)throw uploadErr;
+   payload.logo_path=path;
+  }
+  const {data,error}=await sb.from('pdf_settings').upsert(payload).select().single();
+  if(error)throw error;
+  pdfSettings={...pdfSettings,...data};fillPdfSettingsForm();
+  document.getElementById('pdf_logo_upload').value='';
+  toast('PDF 版型設定已儲存');
+ }catch(e){toast('PDF 設定儲存失敗：'+e.message,true);}
+ finally{btn.disabled=false;}
+}
+/* ================= 服務目錄（管理員 / 業務經理） ================= */
+async function loadCatalog(){
+  try{
+    const { data, error } = await sb.from('service_catalog').select('*').order('sort_order');
+    if(!error && data && data.length > 0){
+      catalog = data;
+    } else {
+      catalog = [...DEFAULT_CATALOG];
+    }
+  }catch(e){
+    console.warn('loadCatalog fallback to local:', e);
+    catalog = [...DEFAULT_CATALOG];
+  }
+  renderCatalog();
+}
+
+function renderCatalog(){
+  const body = document.getElementById('catalogBody');
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  body.innerHTML = '';
+  document.getElementById('catalogEmpty').style.display = catalog.length ? 'none' : 'block';
+  
+  const thAction = document.getElementById('th_catalog_action');
+  if(thAction) thAction.style.display = canManageCatalog ? 'table-cell' : 'none';
+
+  catalog.forEach(item=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(item.category)}</td>
+      <td><b>${escapeHtml(item.item_name)}</b></td>
+      <td>${escapeHtml(item.description||'')}</td>
+      <td>${escapeHtml(item.unit||'式')}</td>
+      <td class="num" style="text-align:right;">${money(item.default_price)}</td>
+      ${canManageCatalog ? `
+        <td style="text-align:center;">
+          <button class="btn btn-ghost btn-sm" onclick="openCatalogEditor('${item.id}')">編輯</button>
+          ${item.id ? `<button class="btn btn-ghost btn-sm" onclick="deleteCatalogItem('${item.id}')" style="color:var(--danger);">刪除</button>` : ''}
+        </td>` : ''}`;
+    body.appendChild(tr);
+  });
+}
+
+async function addCatalogItem(){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法新增服務項目', true);
+    return;
+  }
+  const item_name = document.getElementById('c_name').value.trim();
+  if(!item_name){ toast('請輸入項目名稱', true); return; }
+  const payload = {
+    category: document.getElementById('c_category').value,
+    item_name,
+    description: document.getElementById('c_desc').value.trim(),
+    unit: document.getElementById('c_unit').value.trim() || '式',
+    default_price: Number(document.getElementById('c_price').value)||0,
+    sort_order: catalog.length + 1,
+  };
+  try{
+    const { error } = await sb.from('service_catalog').insert(payload);
+    if(error) throw error;
+    document.getElementById('c_name').value='';
+    document.getElementById('c_desc').value='';
+    document.getElementById('c_price').value='0';
+    await loadCatalog();
+    toast('已新增到服務目錄');
+  }catch(e){
+    toast('新增失敗：' + e.message, true);
+  }
+}
+
+function openCatalogEditor(id){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法編輯服務項目', true);
+    return;
+  }
+  const item = catalog.find(x => String(x.id) === String(id));
+  if(!item){
+    toast('找不到該項目', true);
+    return;
+  }
+  document.getElementById('edit_c_id').value = item.id || '';
+  document.getElementById('edit_c_category').value = item.category || 'ISO驗證';
+  document.getElementById('edit_c_name').value = item.item_name || '';
+  document.getElementById('edit_c_desc').value = item.description || '';
+  document.getElementById('edit_c_unit').value = item.unit || '式';
+  document.getElementById('edit_c_price').value = item.default_price || 0;
+  
+  document.getElementById('catalogEditModal').classList.add('active');
+}
+
+function closeCatalogEditor(){
+  document.getElementById('catalogEditModal').classList.remove('active');
+}
+
+async function saveCatalogEdit(){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法編輯服務項目', true);
+    return;
+  }
+  const id = document.getElementById('edit_c_id').value;
+  const item_name = document.getElementById('edit_c_name').value.trim();
+  if(!item_name){
+    toast('請輸入項目名稱', true);
+    return;
+  }
+  const payload = {
+    category: document.getElementById('edit_c_category').value,
+    item_name,
+    description: document.getElementById('edit_c_desc').value.trim(),
+    unit: document.getElementById('edit_c_unit').value.trim() || '式',
+    default_price: Number(document.getElementById('edit_c_price').value) || 0,
+  };
+
+  const btn = document.getElementById('editCatalogSaveBtn');
+  btn.disabled = true;
+  btn.textContent = '儲存中...';
+
+  try{
+    if(id){
+      const { error } = await sb.from('service_catalog').update(payload).eq('id', id);
+      if(error) throw error;
+    } else {
+      const idx = catalog.findIndex(x => !x.id && x.item_name === item_name);
+      if(idx > -1) catalog[idx] = { ...catalog[idx], ...payload };
+    }
+    toast('服務項目已更新');
+    closeCatalogEditor();
+    await loadCatalog();
+  }catch(e){
+    toast('更新失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '儲存變更';
+  }
+}
+
+async function deleteCatalogItem(id){
+  const canManageCatalog = currentProfile && ['admin', 'manager'].includes(currentProfile.role);
+  if(!canManageCatalog){
+    toast('權限不足：業務人員無法刪除服務項目', true);
+    return;
+  }
+  if(!confirm('確定要刪除這個服務項目嗎？')) return;
+  try{
+    const { error } = await sb.from('service_catalog').delete().eq('id', id);
+    if(error) throw error;
+    await loadCatalog();
+    toast('已刪除服務項目');
+  }catch(e){
+    toast('刪除失敗：' + e.message, true);
+  }
+}
+
+/* ================= 服務目錄挑選核心 ================= */
+function openCatalogPicker(){
+  const modal = document.getElementById('catalogModal');
+  const list = document.getElementById('catalogPickerList');
+  if(!modal || !list) {
+    alert('找不到彈窗元件，請檢查 HTML 結構');
+    return;
+  }
+  
+  list.innerHTML = '';
+  const itemsToShow = (catalog && catalog.length > 0) ? catalog : DEFAULT_CATALOG;
+
+  if(itemsToShow.length === 0){
+    list.innerHTML = '<div class="empty-state">服務目錄是空的，請先至「服務項目管理」新增</div>';
+  } else {
+    itemsToShow.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'list-pick-item';
+      div.style.cursor = 'pointer';
+      div.innerHTML = `
+        <div>
+          <div class="name" style="font-weight:600;">${escapeHtml(item.item_name)}</div>
+          <div class="meta" style="color:var(--muted);font-size:12px;">${escapeHtml(item.category)} · ${escapeHtml(item.description || '標準項目')}</div>
+        </div>
+        <span class="add-tag" style="color:var(--brand);font-weight:600;">+ 加入</span>`;
+      
+      div.onclick = (e) => {
+        e.stopPropagation();
+        addItemRow(item);
+        closeCatalogPicker();
+        toast('已加入：' + item.item_name);
+      };
+      list.appendChild(div);
+    });
+  }
+
+  modal.classList.add('active');
+}
+
+function closeCatalogPicker(){
+  document.getElementById('catalogModal').classList.remove('active');
+}
+
+function addItemRow(prefill){
+  const newRow = blankItemRow(prefill);
+  if (editorItems.length === 1 && !editorItems[0].item_name.trim()) {
+    editorItems[0] = newRow;
+  } else {
+    editorItems.push(newRow);
+  }
+  renderItems();
+  recalcTotals();
+}
+
+
+async function loadNoteTemplates(){
+ const {data,error}=await sb.from('quote_note_templates').select('*').order('sort_order').order('name');
+ if(error){toast('條款範本載入失敗：'+error.message,true);return;}
+ noteTemplates=data||[];
+ const el=document.getElementById('f_note_template');
+ el.innerHTML='<option value="">自行輸入</option>';
+ noteTemplates.filter(t=>t.is_active).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name+(t.is_default?'（預設）':'');el.appendChild(o);});
+ renderNoteTemplates();
+}
+function applyNoteTemplate(id){
+ const t=noteTemplates.find(t=>t.id===id);if(!t)return;
+ const el=document.getElementById('f_notes');
+ if(el.value.trim()&&el.value!==t.content&&!confirm('套用範本會覆蓋現有備註，確定嗎？')){document.getElementById('f_note_template').value='';return;}
+ el.value=t.content;
+}
+function applyDefaultNoteTemplate(){
+ const t=noteTemplates.find(t=>t.is_default&&t.is_active);
+ document.getElementById('f_note_template').value=t?.id||'';
+ if(t)document.getElementById('f_notes').value=t.content;
+}
+function canManageNoteTemplates(){return ['admin','manager'].includes(currentProfile?.role);}
+function resetNoteTemplateForm(){
+ document.getElementById('template_edit_id').value='';
+ document.getElementById('template_name').value='';
+ document.getElementById('template_content').value='';
+ document.getElementById('template_active').checked=true;
+ document.getElementById('template_default').checked=false;
+ document.getElementById('templateFormTitle').textContent='新增條款範本';
+}
+function renderNoteTemplates(){
+ const body=document.getElementById('templatesBody');if(!body)return;
+ const canEdit=canManageNoteTemplates();
+ document.getElementById('templateEditCard').style.display=canEdit?'block':'none';
+ document.getElementById('templatesEmpty').style.display=noteTemplates.length?'none':'block';
+ body.replaceChildren();
+ noteTemplates.forEach(t=>{
+  const tr=document.createElement('tr');
+  const cell=(value)=>{const td=document.createElement('td');td.textContent=value;tr.appendChild(td);return td;};
+  cell(t.name);
+  const preview=cell(t.content);preview.style.whiteSpace='pre-line';preview.style.maxWidth='400px';preview.style.overflowWrap='anywhere';
+  cell(t.is_active?'啟用':'停用');cell(t.is_default?'預設':'—');
+  const action=document.createElement('td');
+  if(canEdit){
+   const edit=document.createElement('button');edit.className='btn btn-line btn-sm';edit.textContent='編輯';edit.onclick=()=>editNoteTemplate(t.id);
+   const del=document.createElement('button');del.className='btn btn-line btn-sm';del.textContent='刪除';del.style.marginLeft='6px';del.onclick=()=>deleteNoteTemplate(t.id);
+   action.append(edit,del);
+  }else action.textContent='僅供查看';
+  tr.appendChild(action);body.appendChild(tr);
+ });
+}
+function editNoteTemplate(id){
+ if(!canManageNoteTemplates())return;
+ const t=noteTemplates.find(x=>x.id===id);if(!t)return;
+ document.getElementById('template_edit_id').value=t.id;
+ document.getElementById('template_name').value=t.name;
+ document.getElementById('template_content').value=t.content;
+ document.getElementById('template_active').checked=t.is_active;
+ document.getElementById('template_default').checked=t.is_default;
+ document.getElementById('templateFormTitle').textContent='編輯條款範本';
+ document.querySelector('.content')?.scrollTo({top:0,behavior:'smooth'});
+}
+async function saveNoteTemplate(){
+ if(!canManageNoteTemplates())return toast('權限不足',true);
+ const id=document.getElementById('template_edit_id').value;
+ const name=document.getElementById('template_name').value.trim();
+ const content=document.getElementById('template_content').value;
+ const is_active=document.getElementById('template_active').checked;
+ const is_default=document.getElementById('template_default').checked;
+ if(!name||!content.trim())return toast('請填寫範本名稱與內容',true);
+ if(is_default&&!is_active)return toast('預設範本必須啟用',true);
+ const payload={name,content,is_active,is_default};
+ try{
+  // 單一預設範本的唯一索引要求先取消舊預設
+  if(is_default){
+   const old=noteTemplates.find(t=>t.is_default&&t.id!==id);
+   if(old){const {error}=await sb.from('quote_note_templates').update({is_default:false}).eq('id',old.id);if(error)throw error;}
+  }
+  const query=id?sb.from('quote_note_templates').update(payload).eq('id',id):sb.from('quote_note_templates').insert(payload);
+  const {error}=await query;if(error)throw error;
+  await loadNoteTemplates();resetNoteTemplateForm();toast('條款範本已儲存');
+ }catch(e){toast('儲存失敗：'+e.message,true);}
+}
+async function deleteNoteTemplate(id){
+ if(!canManageNoteTemplates())return toast('權限不足',true);
+ const t=noteTemplates.find(x=>x.id===id);if(!t)return;
+ if(!confirm('確定刪除「'+t.name+'」？已儲存報價不受影響。'))return;
+ const {error}=await sb.from('quote_note_templates').delete().eq('id',id);
+ if(error)return toast('刪除失敗：'+error.message,true);
+ await loadNoteTemplates();resetNoteTemplateForm();toast('條款範本已刪除');
+}
+
+/* ================= 報價單編輯器 ================= */
+function blankItemRow(prefill){
+  itemSeq++;
+  const id = 'row_' + itemSeq;
+  return { 
+    rowId: id, 
+    category: prefill?.category || 'ISO驗證', 
+    item_name: prefill?.item_name || '', 
+    description: prefill?.description || '', 
+    unit: prefill?.unit || '式', 
+    quantity: 1, 
+    unit_price: prefill?.default_price || 0,
+    is_gift: false 
+  };
+}
+let editorItems = [];
+
+function resetEditor(){
+  currentQuote = null;
+  document.getElementById('quoteNoDisplay').textContent = '自動產生';
+  document.getElementById('f_issue_date').value = todayStr();
+  document.getElementById('f_valid_until').value = plusDays(30);
+  
+  document.getElementById('f_sales_rep').value = currentProfile?.display_name || '';
+  
+  document.getElementById('f_client_name').value = '';
+  document.getElementById('f_contact_person').value = '';
+  document.getElementById('f_tax_id').value = '';
+  document.getElementById('f_phone').value = '';
+  document.getElementById('f_address').value = '';
+  document.getElementById('f_email').value = '';
+  document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
+  document.getElementById('f_notes').value = '報價單有效期限為 30 天。\n付款方式：驗收後 30 天內匯款。\n本報價不含未列項目之額外費用。';
+  document.getElementById('f_status').value = 'draft';
+  applyDefaultNoteTemplate();
+  editorItems = [blankItemRow()];
+  renderItems();
+  recalcTotals();
+  setLocked(false);
+  document.getElementById('deleteBtn').style.display = 'none';
+  updateRoleUI();
+}
+
+function renderItems(){
+  const body = document.getElementById('itemsBody');
+  body.innerHTML = '';
+  editorItems.forEach(row=>{
+    const tr = document.createElement('tr');
+    tr.dataset.rowId = row.rowId;
+    tr.innerHTML = `
+      <td><select onchange="updateItem('${row.rowId}','category',this.value)">
+        <option value="ISO驗證">ISO驗證</option>
+        <option value="資安服務">資安服務</option>
+        <option value="個人資料保護">個人資料保護</option>
+        <option value="法規與標準">法規與標準</option>
+        <option value="其他">其他</option>
+      </select></td>
+      <td><input type="text" value="${escapeAttr(row.item_name)}" placeholder="項目名稱" onchange="updateItem('${row.rowId}','item_name',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(row.description)}" placeholder="規格/說明" onchange="updateItem('${row.rowId}','description',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(row.unit)}" onchange="updateItem('${row.rowId}','unit',this.value)"></td>
+      <td><input type="number" class="qty" value="${row.quantity}" min="0" onchange="updateItem('${row.rowId}','quantity',this.value)"></td>
+      <td><input type="number" class="price" value="${row.unit_price}" min="0" onchange="updateItem('${row.rowId}','unit_price',this.value)"></td>
+      <td><input type="checkbox" aria-label="贈送" ${row.is_gift ? 'checked' : ''} onchange="updateItem('${row.rowId}','is_gift',this.checked)"></td><td class="num-col num">${row.is_gift ? '贈送' : money(row.quantity * row.unit_price)}</td>
+      <td><button class="row-remove" onclick="removeItemRow('${row.rowId}')">✕</button></td>`;
+    tr.querySelector('select').value = row.category;
+    body.appendChild(tr);
+  });
+}
+
+function updateItem(rowId, field, value){
+  const row = editorItems.find(r=>r.rowId===rowId);
+  if(!row) return;
+  row[field] = field==='is_gift' ? Boolean(value) : (field==='quantity'||field==='unit_price') ? Number(value)||0 : value;
+  renderItems();
+  recalcTotals();
+}
+
+function removeItemRow(rowId){
+  editorItems = editorItems.filter(r=>r.rowId!==rowId);
+  if(editorItems.length===0) editorItems.push(blankItemRow());
+  renderItems();
+  recalcTotals();
+}
+function recalcTotals(){
+  const subtotal = editorItems.reduce((s,r)=> s + (r.is_gift ? 0 : r.quantity*r.unit_price), 0);
+  const taxRate = Number(document.getElementById('f_tax_rate').value)||0;
+  const tax = Math.round(subtotal * taxRate / 100);
+  const total = subtotal + tax;
+  document.getElementById('t_subtotal').textContent = money(subtotal);
+  document.getElementById('t_tax').textContent = money(tax);
+  document.getElementById('t_total').textContent = money(total);
+  document.getElementById('editorHeroTotal').textContent = money(total);
+  return { subtotal, tax, total, taxRate };
+}
+
+function setLocked(locked){
+  document.getElementById('lockedBanner').style.display = locked ? 'flex' : 'none';
+  const fieldIds = ['f_issue_date','f_valid_until','f_sales_rep','f_client_name','f_contact_person','f_tax_id','f_phone','f_address','f_email','f_tax_rate','f_notes'];
+  fieldIds.forEach(id=> {
+    const el = document.getElementById(id);
+    if(el) el.disabled = locked;
+  });
+  document.querySelectorAll('#itemsBody input, #itemsBody select').forEach(el=> el.disabled = locked);
+  document.getElementById('f_note_template').disabled = locked;
+  document.getElementById('saveBtn').disabled = locked;
+}
+
+/* ================= 儲存 / 讀取 / 刪除 報價單（綁定擁有者驗證） ================= */
+function collectFormData(){
+  const { subtotal, tax, total, taxRate } = recalcTotals();
+  return {
+    issue_date: document.getElementById('f_issue_date').value || todayStr(),
+    valid_until: document.getElementById('f_valid_until').value || null,
+    sales_rep: document.getElementById('f_sales_rep').value.trim(),
+    client_name: document.getElementById('f_client_name').value.trim(),
+    contact_person: document.getElementById('f_contact_person').value.trim(),
+    tax_id: document.getElementById('f_tax_id').value.trim(),
+    phone: document.getElementById('f_phone').value.trim(),
+    address: document.getElementById('f_address').value.trim(),
+    email: document.getElementById('f_email').value.trim(),
+    notes: document.getElementById('f_notes').value,
+    tax_rate: taxRate,
+    subtotal, tax_amount: tax, total,
+    status: document.getElementById('f_status').value,
+    user_id: currentUser.id
+  };
+}
+
+async function saveQuotation(){
+  const data = collectFormData();
+  if(!data.client_name){ toast('請輸入客戶公司名稱', true); return; }
+  if(editorItems.every(r=>!r.item_name.trim())){ toast('請至少輸入一項服務項目', true); return; }
+
+  // 業務人員權限判定：若已是既有單且不是自己開的，禁止修改
+  if(currentQuote && currentQuote.user_id && currentQuote.user_id !== currentUser.id){
+    const canManageAll = ['admin', 'manager'].includes(currentProfile.role);
+    if(!canManageAll){
+      toast('權限不足：業務人員只能編輯自己開立的報價單', true);
+      return;
+    }
+  }
+
+  const willLock = data.status === 'accepted';
+  data.locked = willLock;
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = '儲存中...';
+
+  try{
+    let quoteId = currentQuote ? currentQuote.id : null;
+    let quoteNo = currentQuote ? currentQuote.quote_no : null;
+
+    if(!quoteId){
+      const { data: noData, error: noErr } = await sb.rpc('next_quote_no', { prefix: companySettings.quote_prefix || 'QT' });
+      if(noErr) throw noErr;
+      quoteNo = noData;
+      const { data: inserted, error: insErr } = await sb.from('quotations').insert({ ...data, quote_no: quoteNo }).select().single();
+      if(insErr) throw insErr;
+      quoteId = inserted.id;
+      currentQuote = inserted;
+    }else{
+      const { error: updErr } = await sb.from('quotations').update(data).eq('id', quoteId);
+      if(updErr) throw updErr;
+      await sb.from('quotation_items').delete().eq('quotation_id', quoteId);
+    }
+
+    const itemRows = editorItems.filter(r=>r.item_name.trim()).map((r,i)=>({
+      quotation_id: quoteId, category:r.category, item_name:r.item_name, description:r.description,
+      unit:r.unit, quantity:r.quantity, unit_price:r.unit_price, is_gift:!!r.is_gift, subtotal:r.is_gift ? 0 : r.quantity*r.unit_price, sort_order:i,
+    }));
+    const { error: itemErr } = await sb.from('quotation_items').insert(itemRows);
+    if(itemErr) throw itemErr;
+
+    try{
+      const exists = clients.some(c => c.company_name === data.client_name);
+      if(!exists && data.client_name){
+        await sb.from('clients').insert({
+          company_name: data.client_name,
+          contact_person: data.contact_person,
+          tax_id: data.tax_id,
+          phone: data.phone,
+          address: data.address,
+          email: data.email
+        });
+        await loadClients();
+      }
+    }catch(err){}
+
+    document.getElementById('quoteNoDisplay').textContent = quoteNo;
+    document.getElementById('deleteBtn').style.display = data.status === 'draft' ? 'inline-flex' : 'none';
+    setLocked(willLock);
+    currentQuote = { ...currentQuote, ...data, id: quoteId, quote_no: quoteNo };
+    toast('報價單已儲存：' + quoteNo);
+    await loadQuotations();
+  }catch(e){
+    toast('儲存失敗：' + e.message, true);
+  }finally{
+    btn.disabled = false; btn.textContent = '儲存報價單';
+  }
+}
+
+async function saveAsNew(){
+  currentQuote = null;
+  document.getElementById('f_status').value = 'draft';
+  setLocked(false);
+  document.getElementById('quoteNoDisplay').textContent = '自動產生（另存新檔）';
+  toast('已解除關聯，儲存後將產生新的報價單編號');
+}
+
+async function loadQuotations(){
+  try{
+    const { data, error } = await sb.from('quotations').select('*').order('created_at', { ascending:false });
+    if(error) throw error;
+    quotations = data || [];
+  }catch(e){
+    console.warn('loadQuotations warning:', e);
+    quotations = [];
+  }
+  renderList();
+}
+
+function renderList(){
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const statusFilter = document.getElementById('filterStatus')?.value || '';
+  const filtered = quotations.filter(row=>{
+    const matchesQ = !q || row.client_name.toLowerCase().includes(q) || row.quote_no.toLowerCase().includes(q);
+    const matchesStatus = !statusFilter || row.status === statusFilter;
+    return matchesQ && matchesStatus;
+  });
+  const body = document.getElementById('listBody');
+  body.innerHTML = '';
+  document.getElementById('listEmpty').style.display = filtered.length ? 'none' : 'block';
+
+  filtered.forEach(row=>{
+    // 判斷該筆報價單是否可由當前登入者編輯（管理員/經理可改全部，業務人員只能改自己開的單）
+    const isOwner = row.user_id === currentUser.id;
+    const canEditThisQuote = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="num">${escapeHtml(row.quote_no)}</td>
+      <td>${escapeHtml(row.client_name)}</td>
+      <td>${escapeHtml(row.issue_date||'')}</td>
+      <td class="num">${money(row.total)}</td>
+      <td><span class="badge ${row.status}">${STATUS_LABEL[row.status]||row.status}</span></td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openQuotation('${row.id}')">${canEditThisQuote ? '檢視／編輯' : '檢視'}</button>
+        <button class="btn btn-ghost btn-sm" onclick="duplicateQuotation('${row.id}')">複製</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+
+async function openQuotation(id){
+  const { data: quote, error } = await sb.from('quotations').select('*').eq('id', id).single();
+  if(error){ toast('讀取失敗：' + error.message, true); return; }
+  const { data: items } = await sb.from('quotation_items').select('*').eq('quotation_id', id).order('sort_order');
+
+  currentQuote = quote;
+  document.getElementById('quoteNoDisplay').textContent = quote.quote_no;
+  document.getElementById('f_issue_date').value = quote.issue_date || todayStr();
+  document.getElementById('f_valid_until').value = quote.valid_until || '';
+  document.getElementById('f_sales_rep').value = quote.sales_rep || '';
+  document.getElementById('f_client_name').value = quote.client_name || '';
+  document.getElementById('contact_person' in quote ? 'f_contact_person' : 'f_contact_person').value = quote.contact_person || '';
+  document.getElementById('f_tax_id').value = quote.tax_id || '';
+  document.getElementById('f_phone').value = quote.phone || '';
+  document.getElementById('f_address').value = quote.address || '';
+  document.getElementById('f_email').value = quote.email || '';
+  document.getElementById('f_tax_rate').value = quote.tax_rate ?? 5;
+  document.getElementById('f_notes').value = quote.notes || '';
+   document.getElementById('f_note_template').value = '';
+  document.getElementById('f_status').value = quote.status || 'draft';
+
+  editorItems = (items && items.length ? items : [{}]).map(it => ({
+    rowId: 'row_' + (++itemSeq),
+    category: it.category || 'ISO驗證',
+    item_name: it.item_name || '',
+    description: it.description || '',
+    unit: it.unit || '式',
+    quantity: it.quantity ?? 1,
+    unit_price: it.unit_price ?? 0,
+    is_gift: !!it.is_gift,
+  }));
+  renderItems();
+  recalcTotals();
+
+  // 業務人員權限判定：非自己開的單進入後直接唯讀鎖定
+  const isOwner = quote.user_id === currentUser.id;
+  const canEdit = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+
+  setLocked(!!quote.locked || !canEdit);
+  document.getElementById('deleteBtn').style.display = (quote.status === 'draft' && canEdit) ? 'inline-flex' : 'none';
+  switchPanel('panel-editor');
+}
+
+async function duplicateQuotation(id){
+  await openQuotation(id);
+  currentQuote = null;
+  document.getElementById('f_status').value = 'draft';
+  setLocked(false);
+  document.getElementById('quoteNoDisplay').textContent = '自動產生（複製自舊報價單）';
+  document.getElementById('deleteBtn').style.display = 'none';
+  toast('已複製內容，儲存後將產生新編號並歸屬至你的帳號');
+}
+
+async function deleteQuotation(){
+  if(!currentQuote){ return; }
+  
+  const isOwner = currentQuote.user_id === currentUser.id;
+  const canDelete = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+  if(!canDelete){
+    toast('權限不足：業務人員只能刪除自己開立的草稿報價單', true);
+    return;
+  }
+
+  if(currentQuote.status !== 'draft'){ toast('只有草稿狀態可以刪除', true); return; }
+  if(!confirm('確定要刪除這張草稿報價單嗎？此動作無法復原。')) return;
+  const { error } = await sb.from('quotations').delete().eq('id', currentQuote.id);
+  if(error){ toast('刪除失敗：' + error.message, true); return; }
+  toast('已刪除');
+  await loadQuotations();
+  resetEditor();
+}
+
+async function unlockQuote(){
+  if(!currentQuote) return;
+  const isOwner = currentQuote.user_id === currentUser.id;
+  const canUnlock = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+  if(!canUnlock){
+    toast('權限不足：無法解鎖他人建立的報價單', true);
+    return;
+  }
+  if(!confirm('確定要解鎖這張已接受的報價單嗎？解鎖後可再次編輯。')) return;
+  const { error } = await sb.from('quotations').update({ locked:false }).eq('id', currentQuote.id);
+  if(error){ toast('解鎖失敗：' + error.message, true); return; }
+  currentQuote.locked = false;
+  setLocked(false);
+  toast('已解鎖，可以編輯');
+}
+
+/* ================= 列印 / PDF ================= */
+function printQuotation(){
+  const data = collectFormData();
+  document.getElementById('p_company_name').textContent = companySettings.company_name || '';
+  document.getElementById('p_company_en').textContent=pdfSettings.company_name_en||'';
+  document.getElementById('p_doc_title').textContent=pdfSettings.document_title||'報價單';
+  document.getElementById('p_doc_title_en').textContent=pdfSettings.document_title_en||'';
+  document.getElementById('p_client_sign_title').textContent=pdfSettings.client_sign_title||'';
+  document.getElementById('p_quote_sign_title').textContent=pdfSettings.quote_sign_title||'';
+  document.getElementById('p_client_sign_label').textContent=pdfSettings.client_sign_label||'';
+  document.getElementById('p_quote_sign_label').textContent=pdfSettings.quote_sign_label||'';
+  document.getElementById('p_approval_label').textContent=pdfSettings.approval_label||'';
+  document.getElementById('p_client_confirm_text').textContent=pdfSettings.client_confirm_text||'';
+  document.getElementById('p_logo').src=pdfLogoUrl();
+  const size={small:40,medium:56,large:72}[pdfSettings.logo_size]||56;
+  document.getElementById('p_logo').style.width=size+'px';
+  document.getElementById('p_logo').style.height=size+'px';
+  document.getElementById('printArea').style.setProperty('--pdf-brand',pdfSettings.brand_color||'#0F625E');
+  const metaParts = [companySettings.address, companySettings.phone ? '電話：'+companySettings.phone : '', companySettings.tax_id ? '統編：'+companySettings.tax_id : ''].filter(Boolean);
+  document.getElementById('p_company_meta').textContent = metaParts.join(' ');
+  document.getElementById('p_quote_no').textContent = currentQuote ? currentQuote.quote_no : '（尚未儲存）';
+  document.getElementById('p_dates').textContent = `開立日期：${data.issue_date} 有效期限：${data.valid_until||'-'}`;
+
+  document.getElementById('p_client').innerHTML = `
+    <b>${escapeHtml(data.client_name||'')}</b><br>
+    聯絡人：${escapeHtml(data.contact_person||'-')} 統編：${escapeHtml(data.tax_id||'-')}<br>
+    地址：${escapeHtml(data.address||'-')}<br>
+    電話：${escapeHtml(data.phone||'-')} Email：${escapeHtml(data.email||'-')}`;
+
+  const itemsBody = document.getElementById('p_items');
+  itemsBody.innerHTML = '';
+  editorItems.filter(r=>r.item_name.trim()).forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><b>${escapeHtml(r.item_name)}</b></td><td>${escapeHtml(r.description)}</td><td>${escapeHtml(r.unit)}</td><td>${r.quantity}</td><td>${money(r.unit_price)}</td><td>${r.is_gift ? "方案贈送" : money(r.quantity*r.unit_price)}</td>`;
+    itemsBody.appendChild(tr);
+  });
+  document.getElementById('p_subtotal').textContent = money(data.subtotal);
+  document.getElementById('p_tax_label').textContent = `稅額（${data.tax_rate}%）`;
+  document.getElementById('p_tax').textContent = money(data.tax_amount);
+  document.getElementById('p_total').textContent = money(data.total);
+  document.getElementById('p_notes').textContent = data.notes || '';
+
+  const logo=document.getElementById('p_logo');
+  if(logo.complete)window.print();
+  else {logo.addEventListener('load',()=>window.print(),{once:true});logo.addEventListener('error',()=>window.print(),{once:true});}
+}
+
+/* ================= 小工具 ================= */
+function escapeHtml(str){
+  return String(str??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(str){ return escapeHtml(str); }
+
+/* ================= 啟動 ================= */
+initSupabase();
+</script>
+</body>
+</html>
