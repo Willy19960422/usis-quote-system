@@ -513,7 +513,9 @@
         <div class="card">
           <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" onclick="switchPanel('panel-templates')">管理付款條件／條款範本</button><span style="font-size:12px;color:#64736e">管理員／經理可設定預設條款</span></div><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><div style="margin-top:6px;font-size:12px;color:#64736e">管理員／經理可於「條款範本管理」設定預設付款條件；有效期限由上方日期欄位獨立控制。</div></div>
           <div class="field" style="margin-bottom:0;">
-            <label style="display:block;margin-bottom:8px">報價條款（逐條編輯，可新增、刪除）</label>
+            <div class="grid2"><div class="field"><label>有效期限（天）</label><input id="termDays" type="number" min="1" value="15" oninput="syncQuoteTermNotes()"></div><div class="field"><label>付款期數</label><select id="termCount" onchange="renderTermStages()"><option value="1">1期</option><option value="2" selected>2期</option><option value="3">3期</option><option value="4">4期</option><option value="5">5期</option><option value="6">6期</option></select></div></div>
+            <div id="termStageRows"></div><div id="termTotal" style="font-size:13px;margin:8px 0 16px"></div>
+            <label style="display:block;margin-bottom:8px">其他條款（逐條編輯，可新增、刪除）</label>
             <div id="quoteTermRows" style="display:flex;flex-direction:column;gap:9px"></div>
             <button class="btn btn-line btn-sm" type="button" id="addQuoteTermBtn" onclick="addQuoteTermRow()" style="margin-top:10px">＋ 新增條款</button>
             <textarea id="f_notes" style="display:none" aria-hidden="true"></textarea>
@@ -2011,11 +2013,54 @@ async function loadNoteTemplates(){
  noteTemplates.filter(t=>t.is_active).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name+(t.is_default?'（預設）':'');el.appendChild(o);});
  renderNoteTemplates();
 }
+let termStages=[{pct:50,detail:''},{pct:50,detail:''}];
+const termNames=['第一期','第二期','第三期','第四期','第五期','第六期'];
+function renderTermStages(){
+ const n=Number(document.getElementById('termCount').value);
+ termStages=Array.from({length:n},(_,i)=>termStages[i]||{pct:0,detail:''});
+ const holder=document.getElementById('termStageRows');holder.replaceChildren();
+ termStages.forEach((stage,i)=>{
+  const row=document.createElement('div');row.style.cssText='display:grid;grid-template-columns:65px 100px minmax(0,1fr);gap:8px;align-items:center;margin:8px 0';
+  const label=document.createElement('strong');label.textContent=termNames[i]+'：';
+  const pct=document.createElement('input');pct.type='number';pct.min=0;pct.max=100;pct.step='.01';pct.value=stage.pct;pct.title='付款比例 %';
+  pct.oninput=()=>{stage.pct=Number(pct.value);syncQuoteTermNotes();};
+  const detail=document.createElement('input');detail.value=stage.detail;detail.placeholder='此期付款條件';detail.oninput=()=>{stage.detail=detail.value;syncQuoteTermNotes();};
+  pct.disabled=detail.disabled=!!currentQuote?.locked;
+  row.append(label,pct,detail);holder.appendChild(row);
+ });syncQuoteTermNotes();
+}
+function structuredTerms(){
+ const days=Number(document.getElementById('termDays').value);
+ const sum=termStages.reduce((n,x)=>n+Number(x.pct),0);
+ const label=document.getElementById('termTotal');
+ label.textContent='付款比例合計 '+sum+'%'+(Math.abs(sum-100)<0.001?' ✓':'（需等於100%）');
+ label.style.color=Math.abs(sum-100)<0.001?'#16805e':'#b93c34';
+ return ['有效期限：'+days+'天','付款條件：'+termStages.length+'期付款（總價金之'+termStages.map(x=>x.pct+'%').join('、')+'）',...termStages.map((x,i)=>termNames[i]+'：'+x.detail)];
+}
+function parseTermStructure(text){
+ const rest=[];let stages=null,days=null;const details={};
+ for(const line of String(text||'').split('\n').filter(Boolean)){
+  let m=line.match(/^(?:有效期限：|報價單有效期限為)\s*(\d+)\s*天/);
+  if(m){days=Number(m[1]);continue;}
+  m=line.match(/^付款條件：\s*(\d+)期付款（總價金之(.+)）/);
+  if(m){const pct=m[2].match(/\d+(?:\.\d+)?(?=%)/g)||[];if(pct.length===Number(m[1])&&pct.length<=6)stages=pct.map(x=>({pct:Number(x),detail:''}));continue;}
+  const i=termNames.findIndex(x=>line.startsWith(x+'：'));
+  if(i>=0){details[i]=line.slice(termNames[i].length+1);continue;}
+  rest.push(line);
+ }
+ if(stages){termStages=stages;document.getElementById('termCount').value=String(stages.length);}
+ else{termStages=[{pct:50,detail:''},{pct:50,detail:''}];document.getElementById('termCount').value='2';}
+ termStages.forEach((x,i)=>x.detail=details[i]||'');
+ const a=document.getElementById('f_issue_date').value,b=document.getElementById('f_valid_until').value;
+ const diff=a&&b?Math.round((new Date(b)-new Date(a))/86400000):15;
+ document.getElementById('termDays').value=days||Math.max(1,diff);
+ renderTermStages();return rest.join('\n');
+}
 function quoteTermValues(){
  return Array.from(document.querySelectorAll('#quoteTermRows .quote-term-input')).map(x=>x.value.trim()).filter(Boolean);
 }
 function syncQuoteTermNotes(){
- document.getElementById('f_notes').value=quoteTermValues().join('\n');
+ document.getElementById('f_notes').value=[...structuredTerms(),...quoteTermValues()].join('\n');
 }
 function addQuoteTermRow(value=''){
  const holder=document.getElementById('quoteTermRows');
@@ -2058,12 +2103,12 @@ function splitQuoteNotes(value){
 }
 function loadQuoteNotes(value){
  const parts=splitQuoteNotes(value);
- setQuoteTermRows(parts.terms);
+ setQuoteTermRows(parseTermStructure(parts.terms));
  document.getElementById('f_extra_notes').value=parts.extra;
 
 }
 function combinedQuoteNotes(){
- const terms=quoteTermValues().join('\n');
+ const terms=[...structuredTerms(),...quoteTermValues()].join('\n');
  const extra=document.getElementById('f_extra_notes').value.trim();
  return terms+(extra?(terms?'\n備註：\n':'備註：\n')+extra:'');
 }
@@ -2071,12 +2116,12 @@ function applyNoteTemplate(id){
  const t=noteTemplates.find(t=>t.id===id);if(!t)return;
  const el=document.getElementById('f_notes');
  if(el.value.trim()&&el.value!==t.content&&!confirm('套用範本會覆蓋現有備註，確定嗎？')){document.getElementById('f_note_template').value='';return;}
- setQuoteTermRows(t.content);
+ setQuoteTermRows(parseTermStructure(t.content));
 }
 function applyDefaultNoteTemplate(){
  const t=noteTemplates.find(t=>t.is_default&&t.is_active);
  document.getElementById('f_note_template').value=t?.id||'';
- if(t)setQuoteTermRows(t.content);
+ if(t)setQuoteTermRows(parseTermStructure(t.content));
 }
 function fillStandardPaymentTerms(){
  const input=document.getElementById('template_content');
@@ -2339,6 +2384,9 @@ function setLocked(locked){
   document.getElementById('f_note_template').disabled = locked;
   document.querySelectorAll('#quoteTermRows .quote-term-input, #quoteTermRows button').forEach(el=>el.disabled=locked);
   document.getElementById('addQuoteTermBtn').disabled=locked;
+  document.getElementById('termDays').disabled=locked;
+  document.getElementById('termCount').disabled=locked;
+  document.querySelectorAll('#termStageRows input').forEach(el=>el.disabled=locked);
   document.getElementById('saveBtn').disabled = locked;
   document.querySelectorAll('#panel-editor button[onclick^="saveV21Library"], #panel-editor button[onclick^="openV21Library"], #panel-editor button[onclick^="saveAsNew"], #panel-editor button[onclick^="resetEditor"]').forEach(el=>el.disabled=locked);
   document.querySelectorAll('#panel-editor button[onclick^="setValidityDays"], #panel-editor button[onclick^="useLastClientQuote"], #panel-editor button[onclick^="addItemRow"], #panel-editor button[onclick^="openCatalogPicker"], #itemsBody button.row-remove').forEach(el=>el.disabled=locked);
@@ -2422,6 +2470,7 @@ async function saveQuotation(){
   if(!data.client_name){ toast('請輸入客戶公司名稱', true); return; }
   if(editorItems.every(r=>!r.item_name.trim())){ toast('請至少輸入一項服務項目', true); return; }
   if(!validateQuoteEditor(data)) return;
+  if(Math.abs(termStages.reduce((n,x)=>n+Number(x.pct),0)-100)>0.001){toast('付款比例加總必須等於100%',true);return;}
   if(currentQuote?.locked){toast('此報價單已鎖定，請由管理員或經理解鎖後再儲存',true);return;}
   // Support old database until the additive discount migration has been applied.
   const {error:discountSchemaError}=await sb.from('quotations').select('discount_type').limit(0);
