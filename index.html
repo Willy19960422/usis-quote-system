@@ -2323,7 +2323,7 @@ function recalcTotals(){
 
 function setLocked(locked){
   document.getElementById('lockedBanner').style.display = locked ? 'flex' : 'none';
-  const fieldIds = ['f_issue_date','f_valid_until','f_sales_rep','f_client_name','f_contact_person','f_tax_id','f_phone','f_address','f_email','f_tax_rate','f_discount_type','f_discount_value','f_notes','f_status'];
+  const fieldIds = ['f_issue_date','f_valid_until','f_sales_rep','f_client_name','f_contact_person','f_tax_id','f_phone','f_address','f_email','f_tax_rate','f_discount_type','f_discount_value','f_notes','f_extra_notes','f_payment_preset','f_payment_custom','f_extra_fee_preset','f_extra_fee_custom','f_status'];
   fieldIds.forEach(id=> {
     const el = document.getElementById(id);
     if(el) el.disabled = locked;
