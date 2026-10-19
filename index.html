@@ -2336,8 +2336,14 @@ async function saveQuotation(){
   if(editorItems.every(r=>!r.item_name.trim())){ toast('請至少輸入一項服務項目', true); return; }
   if(!validateQuoteEditor(data)) return;
   if(currentQuote?.locked){toast('此報價單已鎖定，請由管理員或經理解鎖後再儲存',true);return;}
-  if(data.discount_type!=='none' && Number(data.discount_value)>0){ toast('折扣儲存功能尚需執行 V2.1 資料庫 SQL，請先不要儲存折扣報價', true); return; }
-  delete data.discount_type; delete data.discount_value; delete data.discount_amount;
+  // Support old database until the additive discount migration has been applied.
+  const {error:discountSchemaError}=await sb.from('quotations').select('discount_type').limit(0);
+  if(discountSchemaError){
+    if(data.discount_type!=='none' && Number(data.discount_value)>0){
+      toast('請先執行 V2.1 折扣資料庫 SQL，才能儲存含折扣的報價單',true);return;
+    }
+    delete data.discount_type;delete data.discount_value;delete data.discount_amount;
+  }
 
   // 業務人員權限判定：若已是既有單且不是自己開的，禁止修改
   if(currentQuote && currentQuote.user_id && currentQuote.user_id !== currentUser.id){
