@@ -500,7 +500,7 @@
           <div class="grid2">
             <div class="field" style="position:relative"><label>客戶公司名稱 *</label><input type="text" id="f_client_name" placeholder="輸入名稱搜尋既有客戶" autocomplete="off" oninput="suggestClients(this.value)" onfocus="suggestClients(this.value)"><div id="clientSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:40;background:white;border:1px solid #dce6e3;border-radius:8px;max-height:220px;overflow:auto;box-shadow:0 10px 24px #0002"></div><button type="button" class="btn btn-line btn-sm" style="margin-top:6px" onclick="useLastClientQuote()">帶入此客戶上次報價</button></div>
             <div class="field"><label>聯絡人</label><input type="text" id="f_contact_person"></div>
-            <div class="field"><label>統一編號</label><input type="text" id="f_tax_id"></div>
+            <div class="field"><label>統一編號</label><div style="display:flex;gap:8px;align-items:center"><input type="text" id="f_tax_id" inputmode="numeric" maxlength="8" placeholder="輸入8碼統編" style="flex:1;min-width:0"><button type="button" class="btn btn-line btn-sm" id="quoteTaxLookupBtn" onclick="lookupQuoteCompanyByTaxId()">查詢公司</button></div><div class="hint" id="quoteTaxLookupStatus" role="status" aria-live="polite"></div></div>
             <div class="field"><label>電話</label><input type="text" id="f_phone"></div>
             <div class="field" style="grid-column:1/-1;"><label>地址</label><input type="text" id="f_address"></div>
             <div class="field"><label>Email</label><input type="email" id="f_email"></div>
@@ -1376,6 +1376,35 @@ function renderClientsList(){
   });
 }
 
+async function lookupQuoteCompanyByTaxId(){
+ const tax=document.getElementById('f_tax_id').value.trim();
+ const status=document.getElementById('quoteTaxLookupStatus');
+ const btn=document.getElementById('quoteTaxLookupBtn');
+ if(!/^\\d{8}$/.test(tax)){status.textContent='請輸入完整8碼統編';toast('統編格式須為8碼數字',true);return;}
+ const existing=clients.find(c=>String(c.tax_id||'').trim()===tax);
+ let company;
+ btn.disabled=true;btn.textContent='查詢中...';
+ try{
+  if(existing){company={name:existing.company_name,address:existing.address||''};status.textContent='查詢到既有客戶資料';}
+  else{
+   const {data,error}=await sb.functions.invoke('company-lookup',{body:{tax_id:tax}});
+   if(error)throw new Error('公司查詢服務無法連線，請確認 Edge Function company-lookup 已部署');
+   if(data?.error)throw new Error(data.error);
+   company=data?.company;
+   if(!company){status.textContent='查無公司登記資料，可手動填寫';return;}
+   status.textContent='查詢到公司登記資料，請核對實際聯絡地址';
+  }
+  const name=company.name||'',address=company.address||'';
+  const nameEl=document.getElementById('f_client_name'),addressEl=document.getElementById('f_address');
+  if((nameEl.value.trim()&&nameEl.value.trim()!==name)||(addressEl.value.trim()&&addressEl.value.trim()!==address)){
+   if(!confirm('查詢結果將覆蓋目前公司名稱或地址，確定套用嗎？'))return;
+  }
+  if(name){nameEl.value=name;nameEl.dispatchEvent(new Event('input',{bubbles:true}));}
+  if(address)addressEl.value=address;
+  toast('已帶入公司資料');
+ }catch(e){console.error(e);status.textContent=e.message;toast('統編查詢失敗：'+e.message,true);}
+ finally{btn.disabled=false;btn.textContent='查詢公司';}
+}
 async function lookupCompanyByTaxId(){
  const tax=document.getElementById('cli_tax').value.trim();
  const status=document.getElementById('cliLookupStatus');
