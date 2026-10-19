@@ -2139,9 +2139,14 @@ async function saveV21Library(kind){
   payload.notes=document.getElementById('f_notes').value;
   payload.tax_rate=Number(document.getElementById('f_tax_rate').value)||0;
  }
- const {error}=await sb.from(table).insert(payload);
+ const {data:existing,error:lookupError}=await sb.from(table).select('id').eq('name',payload.name).maybeSingle();
+ if(lookupError){toast('查詢失敗：'+lookupError.message+'。請確認 V2.1 SQL 已執行。',true);return;}
+ if(existing&&!confirm('「'+payload.name+'」已存在，要以目前編輯器的內容覆蓋更新嗎？'))return;
+ const {error}=existing
+  ?await sb.from(table).update(payload).eq('id',existing.id)
+  :await sb.from(table).insert(payload);
  if(error){toast('儲存失敗：'+error.message+'。請確認 V2.1 資料庫 SQL 已執行。',true);return;}
- toast('已儲存'+(kind==='bundle'?'服務套餐':'報價範本')+'：'+name.trim());
+ toast((existing?'已更新':'已新增')+(kind==='bundle'?'服務套餐':'報價範本')+'：'+name.trim());
 }
 /* ================= 報價單編輯器 ================= */
 function blankItemRow(prefill){
@@ -2254,6 +2259,7 @@ function setLocked(locked){
   document.querySelectorAll('#itemsBody input, #itemsBody select').forEach(el=> el.disabled = locked);
   document.getElementById('f_note_template').disabled = locked;
   document.getElementById('saveBtn').disabled = locked;
+  document.querySelectorAll('#panel-editor button[onclick^="saveV21Library"], #panel-editor button[onclick^="openV21Library"], #panel-editor button[onclick^="saveAsNew"], #panel-editor button[onclick^="resetEditor"]').forEach(el=>el.disabled=locked);
   document.querySelectorAll('#panel-editor button[onclick^="setValidityDays"], #panel-editor button[onclick^="useLastClientQuote"], #panel-editor button[onclick^="addItemRow"], #panel-editor button[onclick^="openCatalogPicker"], #itemsBody button.row-remove').forEach(el=>el.disabled=locked);
 }
 
