@@ -442,14 +442,6 @@
 
       <!-- 1. 新增／編輯報價單 -->
       <div class="panel active" id="panel-editor">
-        <div class="quote-editor-hero">
-          <div>
-            <div class="eyebrow">USIS · QUOTATION WORKSPACE</div>
-            <div class="headline">企業正式報價單</div>
-            <div class="subline">依照正式 PDF 順序填寫：報價資訊 → 客戶 → 服務 → 金額 → 條款</div>
-          </div>
-          <div class="hero-total"><div class="caption">目前報價總額（含稅）</div><strong id="editorHeroTotal">NT$0</strong></div>
-        </div>
         <div id="lockedBanner" class="locked-banner" style="display:none;">
           <span>🔒 此報價單狀態為「已接受」，已鎖定無法編輯。如需修改請先解鎖。</span>
           <button class="btn btn-sm btn-line" onclick="unlockQuote()">解鎖</button>
@@ -2166,7 +2158,7 @@ function recalcTotals(){
   document.getElementById('t_subtotal').textContent = money(subtotal);
   document.getElementById('t_tax').textContent = money(tax);
   document.getElementById('t_total').textContent = money(total);
-  document.getElementById('editorHeroTotal').textContent = money(total);
+
   return { subtotal, discount, discountType, discountValue, tax, total, taxRate };
 }
 
