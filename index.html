@@ -498,7 +498,7 @@
             <button class="btn btn-line btn-sm" onclick="openClientPicker()">+ 從既有客戶帶入</button>
           </h2>
           <div class="grid2">
-            <div class="field"><label>統一編號</label><div style="display:flex;gap:8px;align-items:center"><input type="text" id="f_tax_id" inputmode="numeric" maxlength="8" placeholder="輸入8碼統編" style="flex:1;min-width:0" onblur="autoLookupQuoteCompany()" oninput="quoteTaxLookupChanged()"><button type="button" class="btn btn-line btn-sm" id="quoteTaxLookupBtn" onclick="lookupQuoteCompanyByTaxId()">查詢公司</button></div><div class="hint" id="quoteTaxLookupStatus" role="status" aria-live="polite">輸入8碼統編，離開欄位後自動查詢</div></div>
+            <div class="field"><label>統一編號</label><div style="display:flex;gap:8px;align-items:center"><input type="text" id="f_tax_id" inputmode="numeric" maxlength="8" placeholder="輸入8碼統編" style="flex:1;min-width:0" onblur="autoLookupQuoteCompany()" oninput="quoteTaxLookupChanged()"></div><div class="hint" id="quoteTaxLookupStatus" role="status" aria-live="polite">輸入8碼統編，離開欄位後自動查詢</div></div>
             <div class="field" style="position:relative"><label>客戶公司名稱 *</label><input type="text" id="f_client_name" placeholder="輸入名稱搜尋既有客戶" autocomplete="off" oninput="suggestClients(this.value)" onfocus="suggestClients(this.value)"><div id="clientSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:40;background:white;border:1px solid #dce6e3;border-radius:8px;max-height:220px;overflow:auto;box-shadow:0 10px 24px #0002"></div><button type="button" class="btn btn-line btn-sm" style="margin-top:6px" onclick="useLastClientQuote()">帶入此客戶上次報價</button></div>
             <div class="field"><label>聯絡人</label><input type="text" id="f_contact_person"></div>
             <div class="field"><label>電話</label><input type="text" id="f_phone"></div>
@@ -1389,7 +1389,6 @@ function autoLookupQuoteCompany(){
 async function lookupQuoteCompanyByTaxId(automatic=false){
  const tax=document.getElementById('f_tax_id').value.trim();
  const status=document.getElementById('quoteTaxLookupStatus');
- const btn=document.getElementById('quoteTaxLookupBtn');
  if(!/^\d{8}$/.test(tax)){
   if(!automatic){status.textContent='請輸入完整8碼統編';toast('統編格式須為8碼數字',true);}
   return;
@@ -1397,7 +1396,7 @@ async function lookupQuoteCompanyByTaxId(automatic=false){
  if(quoteTaxLookupPromise){await quoteTaxLookupPromise;if(tax===lastQuoteTaxLookup)return;}
  if(automatic&&tax===lastQuoteTaxLookup)return;
  const run=async()=>{
-  btn.disabled=true;btn.textContent='查詢中...';status.textContent='正在查詢公司資料...';
+  status.textContent='正在查詢公司資料...';
   try{
    const existing=clients.find(c=>String(c.tax_id||'').trim()===tax);
    let company;
@@ -1422,7 +1421,7 @@ async function lookupQuoteCompanyByTaxId(automatic=false){
    lastQuoteTaxLookup=tax;
    status.textContent='已帶入公司資料，請確認公司名稱與地址';
   }catch(e){console.error(e);status.textContent=e.message;if(!automatic)toast('統編查詢失敗：'+e.message,true);}
-  finally{btn.disabled=false;btn.textContent='查詢公司';}
+  finally{}
  };
  quoteTaxLookupPromise=run();
  try{await quoteTaxLookupPromise;}finally{quoteTaxLookupPromise=null;}
