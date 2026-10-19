@@ -510,7 +510,7 @@
         </div>
 
         <div class="card">
-          <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select></div>
+          <h2><span class="editor-heading-label"><span class="editor-step">04</span>付款條件與備註</span></h2><div class="field"><label>條款範本</label><select id="f_note_template" onchange="applyNoteTemplate(this.value)"><option value="">自行輸入</option></select><div style="margin-top:6px;font-size:12px;color:#64736e">管理員／經理可於「條款範本管理」設定預設付款條件；有效期限由上方日期欄位獨立控制。</div></div>
           <div class="field" style="margin-bottom:0;">
             <textarea id="f_notes" rows="5"></textarea>
           </div>
@@ -2194,7 +2194,7 @@ function resetEditor(){
   document.getElementById('f_tax_rate').value = companySettings.default_tax_rate ?? 5;
   document.getElementById('f_discount_type').value = 'none';
   document.getElementById('f_discount_value').value = 0;
-  document.getElementById('f_notes').value = '有效期限：15天\n付款條件：二期付款（總價金之50%、50%）\n第一期：訂單確認後，七日內以匯款或即期支票。\n第二期：驗證通過，尾款付清後交付證書及 IAF 可查詢。';
+  document.getElementById('f_notes').value = ''; // 條款由後台預設範本決定，不硬編碼付款條件。
   document.getElementById('f_status').value = 'draft';
   applyDefaultNoteTemplate();
   editorItems = [blankItemRow()];
