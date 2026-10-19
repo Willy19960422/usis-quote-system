@@ -448,7 +448,7 @@
         </div>
 
         <div class="card">
-          <h2><span class="editor-heading-label"><span class="editor-step">01</span>報價單資訊 <span class="n" id="quoteNoDisplay" style="margin-left:10px">自動產生</span></span></h2>
+          <h2><span class="editor-heading-label"><span class="editor-step">01</span>報價單資訊 <span class="n" id="quoteNoDisplay" style="margin-left:10px">自動產生</span></span><span style="display:flex;gap:6px"><button class="btn btn-line btn-sm" onclick="openV21Library('template')">套用報價範本</button><button class="btn btn-line btn-sm" onclick="saveV21Library('template')">儲存為範本</button></span></h2>
           <div class="grid3">
             <div class="field"><label>開立日期</label><input type="date" id="f_issue_date"></div>
             <div class="field"><label>有效期限</label><input type="date" id="f_valid_until"><div style="display:flex;gap:5px;margin-top:6px"><button type="button" class="btn btn-line btn-sm" onclick="setValidityDays(15)">15 天</button><button type="button" class="btn btn-line btn-sm" onclick="setValidityDays(30)">30 天</button><button type="button" class="btn btn-line btn-sm" onclick="setValidityDays(60)">60 天</button></div></div>
@@ -492,6 +492,8 @@
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="btn btn-line btn-sm" onclick="addItemRow()">+ 新增空白項目</button>
             <button class="btn btn-line btn-sm" onclick="openCatalogPicker()">+ 從服務目錄新增</button>
+            <button class="btn btn-line btn-sm" onclick="openV21Library('bundle')">服務套餐</button>
+            <button class="btn btn-line btn-sm" onclick="saveV21Library('bundle')">儲存套餐</button>
           </div>
 
           <div class="totals">
@@ -2063,6 +2065,51 @@ async function deleteNoteTemplate(id){
  await loadNoteTemplates();resetNoteTemplateForm();toast('條款範本已刪除');
 }
 
+/* ================= V2.1 套餐與整張報價範本 ================= */
+const V21_TABLES={bundle:'service_bundles',template:'quotation_templates'};
+function canManageV21Library(){return ['admin','manager'].includes(currentProfile?.role);}
+function serializeV21Items(){return editorItems.filter(r=>r.item_name.trim()).map(({category,item_name,description,unit,quantity,unit_price,is_gift})=>({category,item_name,description,unit,quantity,unit_price,is_gift}));}
+async function openV21Library(kind){
+ if(currentQuote?.locked){toast('此報價單已鎖定',true);return;}
+ const table=V21_TABLES[kind];if(!table)return;
+ const {data,error}=await sb.from(table).select('*').order('name');
+ if(error){toast('無法載入'+(kind==='bundle'?'服務套餐':'報價範本')+'：請先執行 V2.1 資料庫 SQL。'+error.message,true);return;}
+ if(!data?.length){toast('目前沒有可套用的'+(kind==='bundle'?'套餐':'範本'));return;}
+ const list=data.map((x,i)=>(i+1)+'. '+x.name).join('\n');
+ const selected=prompt('輸入要套用的編號：\n'+list);
+ if(selected===null)return;
+ const i=Number(selected)-1;if(!Number.isInteger(i)||i<0||i>=data.length){toast('編號無效',true);return;}
+ const chosen=data[i];
+ if(kind==='template'&&!confirm('套用報價範本將取代目前明細與備註，確定嗎？'))return;
+ const rows=(chosen.items||[]).map(x=>blankItemRow(x));
+ if(kind==='bundle'){
+  if(editorItems.length===1&&!editorItems[0].item_name.trim())editorItems=[];
+  editorItems.push(...rows);
+ }else{
+  editorItems=rows;
+  document.getElementById('f_notes').value=chosen.notes||'';
+  document.getElementById('f_tax_rate').value=chosen.tax_rate??5;
+ }
+ if(!editorItems.length)editorItems=[blankItemRow()];
+ renderItems();recalcTotals();toast('已套用：'+chosen.name);
+}
+async function saveV21Library(kind){
+ if(!canManageV21Library()){toast('只有管理員或經理可以管理套餐與範本',true);return;}
+ if(currentQuote?.locked){toast('已鎖定報價單不可建立範本',true);return;}
+ const table=V21_TABLES[kind];if(!table)return;
+ const name=prompt('請輸入'+(kind==='bundle'?'服務套餐':'報價範本')+'名稱：');
+ if(!name?.trim())return;
+ const items=serializeV21Items();
+ if(!items.length){toast('請先加入至少一項服務',true);return;}
+ const payload={name:name.trim(),items};
+ if(kind==='template'){
+  payload.notes=document.getElementById('f_notes').value;
+  payload.tax_rate=Number(document.getElementById('f_tax_rate').value)||0;
+ }
+ const {error}=await sb.from(table).insert(payload);
+ if(error){toast('儲存失敗：'+error.message+'。請確認 V2.1 資料庫 SQL 已執行。',true);return;}
+ toast('已儲存'+(kind==='bundle'?'服務套餐':'報價範本')+'：'+name.trim());
+}
 /* ================= 報價單編輯器 ================= */
 function blankItemRow(prefill){
   itemSeq++;
@@ -2073,9 +2120,9 @@ function blankItemRow(prefill){
     item_name: prefill?.item_name || '', 
     description: prefill?.description || '', 
     unit: prefill?.unit || '式', 
-    quantity: 1, 
-    unit_price: prefill?.default_price || 0,
-    is_gift: false 
+    quantity: prefill?.quantity ?? 1, 
+    unit_price: prefill?.unit_price ?? prefill?.default_price ?? 0,
+    is_gift: !!prefill?.is_gift 
   };
 }
 let editorItems = [];
