@@ -2257,6 +2257,7 @@ async function saveQuotation(){
   if(!data.client_name){ toast('請輸入客戶公司名稱', true); return; }
   if(editorItems.every(r=>!r.item_name.trim())){ toast('請至少輸入一項服務項目', true); return; }
   if(!validateQuoteEditor(data)) return;
+  if(currentQuote?.locked){toast('此報價單已鎖定，請由管理員或經理解鎖後再儲存',true);return;}
   if(data.discount_type!=='none' && Number(data.discount_value)>0){ toast('折扣儲存功能尚需執行 V2.1 資料庫 SQL，請先不要儲存折扣報價', true); return; }
   delete data.discount_type; delete data.discount_value; delete data.discount_amount;
 
@@ -2316,7 +2317,7 @@ async function saveQuotation(){
     }catch(err){}
 
     document.getElementById('quoteNoDisplay').textContent = quoteNo;
-    document.getElementById('deleteBtn').style.display = data.status === 'draft' ? 'inline-flex' : 'none';
+    document.getElementById('deleteBtn').style.display = data.status === 'draft' && ['admin','manager'].includes(currentProfile.role) && !willLock ? 'inline-flex' : 'none';
     setLocked(willLock);
     currentQuote = { ...currentQuote, ...data, id: quoteId, quote_no: quoteNo };
     toast('報價單已儲存：' + quoteNo);
@@ -2421,7 +2422,7 @@ async function openQuotation(id){
   const canEdit = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
 
   setLocked(!!quote.locked || !canEdit);
-  document.getElementById('deleteBtn').style.display = (quote.status === 'draft' && canEdit) ? 'inline-flex' : 'none';
+  document.getElementById('deleteBtn').style.display = (quote.status === 'draft' && !quote.locked && ['admin','manager'].includes(currentProfile.role)) ? 'inline-flex' : 'none';
   switchPanel('panel-editor');
 }
 
@@ -2438,13 +2439,13 @@ async function duplicateQuotation(id){
 async function deleteQuotation(){
   if(!currentQuote){ return; }
   
-  const isOwner = currentQuote.user_id === currentUser.id;
-  const canDelete = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+  const canDelete = ['admin', 'manager'].includes(currentProfile.role);
   if(!canDelete){
-    toast('權限不足：業務人員只能刪除自己開立的草稿報價單', true);
+    toast('權限不足：只有管理員或經理可以刪除報價單', true);
     return;
   }
 
+  if(currentQuote.locked){ toast('已鎖定報價單不可刪除，請先解鎖', true); return; }
   if(currentQuote.status !== 'draft'){ toast('只有草稿狀態可以刪除', true); return; }
   if(!confirm('確定要刪除這張草稿報價單嗎？此動作無法復原。')) return;
   const { error } = await sb.from('quotations').delete().eq('id', currentQuote.id);
@@ -2456,13 +2457,12 @@ async function deleteQuotation(){
 
 async function unlockQuote(){
   if(!currentQuote) return;
-  const isOwner = currentQuote.user_id === currentUser.id;
-  const canUnlock = ['admin', 'manager'].includes(currentProfile.role) || isOwner;
+  const canUnlock = ['admin', 'manager'].includes(currentProfile.role);
   if(!canUnlock){
-    toast('權限不足：無法解鎖他人建立的報價單', true);
+    toast('權限不足：只有管理員或經理可以解鎖', true);
     return;
   }
-  if(!confirm('確定要解鎖這張已接受的報價單嗎？解鎖後可再次編輯。')) return;
+  if(!confirm('確定要解鎖這張報價單嗎？解鎖後可再次編輯。')) return;
   const { error } = await sb.from('quotations').update({ locked:false }).eq('id', currentQuote.id);
   if(error){ toast('解鎖失敗：' + error.message, true); return; }
   currentQuote.locked = false;
