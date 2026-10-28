@@ -2914,6 +2914,12 @@ async function downloadQuotationPdf(){
   await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));
   const filename=clean('USIS_報價單_'+no+'_'+name)+'.pdf';
   const watermark=createPdfWatermarkMetadata();
+  // A4 210×297mm：讓浮水印至少覆蓋完整紙張高度，而不只是內容高度。
+  // 多頁報價時延伸到最後一頁紙張底部（包括簽章下方的留白）。
+  const pagePx=Math.floor(clone.getBoundingClientRect().width*297/210);
+  const pageCount=Math.max(1,Math.ceil(clone.scrollHeight/pagePx));
+  clone.style.minHeight=(pagePx*pageCount)+'px';
+  clone.style.boxSizing='border-box';
   addRasterPdfWatermark(clone,watermark);
   const pdf=await html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(clone).toPdf().get('pdf');
   // Footer is supplemental metadata; the repeating watermark above is composited into the page image.
