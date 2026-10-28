@@ -3,6 +3,7 @@
 <title>USIS｜PDF 動態浮水印測試</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script defer src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{font-family:"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;color:#173f36;background:#f4f8f6}*{box-sizing:border-box}body{margin:0}
 header{background:#0F5C4F;color:#fff;padding:20px 26px}header h1{margin:0;font-size:23px}header p{margin:6px 0 0;color:#d6e8e2;font-size:13px}
@@ -27,6 +28,7 @@ main{max-width:1090px;margin:22px auto;padding:0 18px}
 <main>
 <section class="panel">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px"><strong style="font-size:19px">浮水印測試設定</strong><span class="tag">POC 測試版</span></div>
+  <p id="accountStatus" class="hint" aria-live="polite">正在檢查目前的登入帳號與公司設定…</p>
   <div class="grid">
     <div class="field"><label for="company">企業名稱</label><input id="company" value="優士國際資安股份有限公司" maxlength="50"></div>
     <div class="field"><label for="operator">匯出者</label><input id="operator" value="測試使用者" maxlength="40"></div>
@@ -48,6 +50,28 @@ main{max-width:1090px;margin:22px auto;padding:0 18px}
   <div class="sign"><div><b>客戶訂購確認欄</b><br><br>承辦人簽章：</div><div><b>報價確認欄</b><br><br>承辦人簽章：</div></div>
 </div></template>
 <script>
+/* 只讀取與正式報價系統同源、同一登入狀態的資料；測試頁不寫入 Supabase。 */
+async function loadLoggedInUserAndCompany(){
+ const status=document.getElementById('accountStatus');
+ try{
+  if(!window.supabase)throw new Error('Supabase 元件未載入');
+  const url=localStorage.getItem('usis_sb_url')||'https://jkhdalsqdjugcweepvmt.supabase.co';
+  const key=localStorage.getItem('usis_sb_key')||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpraGRhbHNxZGp1Z2N3ZWVwdm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5ODc4MDcsImV4cCI6MjEwNDU2MzgwN30.ryURSFwu5gEYwk0gqvFgdP-fP-7jlN3ReH37CbzKW8o';
+  const client=window.supabase.createClient(url,key);
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){status.textContent='目前未登入報價系統：可手動填寫測試資料。若已登入，請從相同瀏覽器開啟本頁。';return;}
+  const [profile,company]=await Promise.all([
+   client.from('profiles').select('display_name').eq('id',user.id).maybeSingle(),
+   client.from('company_settings').select('company_name').eq('id',1).maybeSingle()
+  ]);
+  const displayName=profile.data?.display_name?.trim()||user.email||'未知使用者';
+  const companyName=company.data?.company_name?.trim();
+  if(companyName)document.getElementById('company').value=companyName;
+  document.getElementById('operator').value=displayName;
+  status.textContent='✅ 已從目前登入的帳號自動帶入匯出者'+(companyName?'與公司名稱':'；公司名稱讀取失敗，可手動測試')+'。此頁僅讀取，不會修改資料。';
+ }catch(err){status.textContent='無法自動讀取登入資料（'+err.message+'），仍可手動測試。';}
+}
+window.addEventListener('load',loadLoggedInUserAndCompany);
 let previewUrl=null,previewName='USIS-watermark-demo.pdf';
 function safeText(v,fallback,max){return String(v||fallback).trim().slice(0,max);}
 function makeMeta(){
@@ -89,6 +113,13 @@ async function generatePDF(){
    rows.appendChild(tr);
   }
   outer.appendChild(doc);document.body.appendChild(outer);
+  // 將畫布延伸到整張 A4 的頁面底部，不依賴實際文字內容高度。
+  // 用 CSS 794px 寬 A4 紙張比例換算每頁約 1122px，跨頁時補足最後一頁。
+  const pagePx=Math.floor(doc.getBoundingClientRect().width*297/210);
+  const pageCount=Math.max(1,Math.ceil(doc.scrollHeight/pagePx));
+  doc.style.minHeight=(pagePx*pageCount)+'px';
+  doc.style.boxSizing='border-box';
+  doc.querySelector('.header h2').textContent=meta.company;
   attachWatermark(doc,meta,Number(document.getElementById('opacity').value)||0.12);
   const pdf=await html2pdf().set({margin:0,filename:'USIS-浮水印測試.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(doc).toPdf().get('pdf');
   const pages=pdf.internal.getNumberOfPages();
