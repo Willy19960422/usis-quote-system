@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USIS｜PDF 動態浮水印測試</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script defer src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<style>
+:root{font-family:"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;color:#173f36;background:#f4f8f6}*{box-sizing:border-box}body{margin:0}
+header{background:#0F5C4F;color:#fff;padding:20px 26px}header h1{margin:0;font-size:23px}header p{margin:6px 0 0;color:#d6e8e2;font-size:13px}
+main{max-width:1090px;margin:22px auto;padding:0 18px}
+.panel{background:#fff;border:1px solid #d9e7e1;border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 4px 24px #0f5c4f0d}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.field label{font-size:12px;font-weight:700;color:#416b60;display:block;margin-bottom:8px}
+.field input,.field select{width:100%;padding:11px;border:1px solid #c9d9d3;border-radius:8px;font:inherit;font-size:14px;color:#173f36}
+.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}.btn{border:0;background:#0F5C4F;color:#fff;padding:12px 20px;border-radius:8px;cursor:pointer;font:inherit;font-weight:700}.btn:disabled{opacity:.55;cursor:wait}.secondary{background:#e1eee8;color:#0F5C4F;text-decoration:none;display:inline-block}.tag{background:#fff2d9;color:#825800;font-size:12px;border-radius:20px;padding:6px 10px}
+.hint{font-size:13px;color:#59716a;line-height:1.8}.meta{font-family:Arial,sans-serif;font-size:12px;word-break:break-all;color:#416b60}
+#viewer{width:100%;height:750px;border:1px solid #d5e5df;border-radius:8px;background:#ecf1ef}#previewPanel{display:none}
+@media(max-width:730px){.grid{grid-template-columns:1fr}#viewer{height:62vh}}
+/* 在 PDF 產生時套用的報價模板 */
+.sheet{width:794px;background:white;color:#222;padding:30px 32px;font-family:"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;font-size:12px;line-height:1.6}
+.sheet .header{text-align:center;border:0;padding:0 0 14px}.sheet h2{font-size:23px;color:#111;margin:0 0 4px;letter-spacing:3px}.sheet .en{font-family:Arial,sans-serif;color:#888;font-size:10px}
+.sheet .title{text-align:center;font-size:25px;font-weight:700;letter-spacing:14px;margin:8px 0 12px}
+.sheet .info{display:flex;border:1px solid #444;margin-bottom:0}.sheet .info>div{width:50%;padding:10px 12px}.sheet .info>div+div{border-left:1px solid #444}
+.sheet table{width:100%;border-collapse:collapse;margin:0}.sheet th,.sheet td{border:1px solid #444;padding:8px 7px;vertical-align:top}.sheet th{background:#dcebe6}.sheet .total{text-align:right;font-weight:700;font-size:15px;margin:18px 0}
+.sheet .terms{border:1px solid #afc8bf;padding:13px 16px;margin:18px 0}.sheet .sign{display:flex;border:1px solid #999}.sheet .sign>div{width:50%;padding:10px;height:105px}.sheet .sign>div+div{border-left:1px solid #999}
+</style></head>
+<body>
+<header><h1>USIS｜PDF 動態浮水印實作測試</h1><p>使用與報價系統相同的 html2pdf.js 0.10.1 • 獨立展示頁，不讀取正式報價或 Supabase 資料</p></header>
+<main>
+<section class="panel">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px"><strong style="font-size:19px">浮水印測試設定</strong><span class="tag">POC 測試版</span></div>
+  <div class="grid">
+    <div class="field"><label for="company">企業名稱</label><input id="company" value="優士國際資安股份有限公司" maxlength="50"></div>
+    <div class="field"><label for="operator">匯出者</label><input id="operator" value="測試使用者" maxlength="40"></div>
+    <div class="field"><label for="opacity">浮水印深淺</label><select id="opacity"><option value="0.08">8% 極淡</option><option value="0.12" selected>12% 淡</option><option value="0.16">16% 明顯</option><option value="0.22">22% 強化</option></select></div>
+  </div>
+  <div class="actions"><button id="generate" class="btn" onclick="generatePDF()">產生 PDF 並預覽</button><button id="download" class="btn secondary" onclick="downloadPDF()" disabled>下載這份 PDF</button><label class="hint"><input type="checkbox" id="long"> 產生跨頁測試（約 2 頁）</label></div>
+  <p class="hint">每次產生都會更新識別碼；浮水印會先與頁面一起合成影像。正式 SaaS 仍需要後端強制產生與 Audit Log，才能提升追蹤可信度。</p>
+  <div id="status" class="meta" aria-live="polite">尚未產生 PDF</div>
+</section>
+<section class="panel" id="previewPanel"><h3 style="margin-top:0">PDF 預覽</h3><iframe id="viewer" title="浮水印 PDF 預覽"></iframe></section>
+</main>
+<template id="quoteTemplate"><div class="sheet">
+  <div class="header"><h2>優士國際資安股份有限公司</h2><div class="en">USIS Inc.</div></div>
+  <div class="title">報 價 單</div>
+  <div class="info"><div><b>客戶名稱：</b>範例科技股份有限公司<br>聯絡人員：王先生<br>聯絡電話：02-0000-0000<br>聯絡地址：臺灣示範地址</div><div>報價日期：2026/10/28<br>報價單號：DEMO-20261028<br>報價人員：測試使用者<br>文件狀態：測試預覽</div></div>
+  <table><thead><tr><th style="width:7%">項目</th><th>品名規格／服務內容</th><th style="width:12%">數量</th><th style="width:18%">單價</th><th style="width:20%">金額</th></tr></thead><tbody class="rows"></tbody></table>
+  <div class="total">總計（含稅）　NT$ 315,000</div>
+  <div class="terms"><b>付款條件與備註</b><br>1. 本文件僅供技術測試，金額與公司資料均為示意。<br>2. 內容與正式報價無關。<br>3. 文件將套用匯出者專屬浮水印與唯一識別碼。</div>
+  <div class="sign"><div><b>客戶訂購確認欄</b><br><br>承辦人簽章：</div><div><b>報價確認欄</b><br><br>承辦人簽章：</div></div>
+</div></template>
+<script>
+let previewUrl=null,previewName='USIS-watermark-demo.pdf';
+function safeText(v,fallback,max){return String(v||fallback).trim().slice(0,max);}
+function makeMeta(){
+ const bytes=new Uint8Array(9);crypto.getRandomValues(bytes);
+ return {id:'USIS-'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase(),
+ company:safeText(document.getElementById('company').value,'優士國際',36),
+ operator:safeText(document.getElementById('operator').value,'測試使用者',32),
+ timestamp:new Date().toLocaleString('sv-SE',{timeZone:'Asia/Taipei',hour12:false})};
+}
+function attachWatermark(node,meta,alpha){
+ const tile=document.createElement('canvas');tile.width=620;tile.height=310;
+ const c=tile.getContext('2d');c.translate(310,155);c.rotate(-Math.PI/6);
+ c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(15,92,79,'+alpha+')';
+ c.font='700 23px "Noto Sans TC","Microsoft JhengHei",sans-serif';
+ c.fillText(meta.company+'｜內部文件',0,-32,560);
+ c.font='600 18px "Noto Sans TC","Microsoft JhengHei",sans-serif';
+ c.fillText('匯出者：'+meta.operator,0,3,550);
+ c.font='600 17px Arial,sans-serif';c.fillText('ID: '+meta.id,0,36,550);
+ const layer=document.createElement('div');layer.setAttribute('aria-hidden','true');
+ layer.style.cssText='position:absolute;inset:0;z-index:30;pointer-events:none;background-repeat:repeat;background-position:center top;';
+ layer.style.backgroundImage='url("'+tile.toDataURL('image/png')+'")';
+ node.style.position='relative';node.appendChild(layer);
+}
+async function generatePDF(){
+ const btn=document.getElementById('generate'),msg=document.getElementById('status');
+ btn.disabled=true;msg.textContent='PDF 產生中…';
+ let outer=null;
+ try{
+  if(typeof html2pdf!=='function')throw new Error('html2pdf.js 未載入');
+  await document.fonts.ready;
+  const meta=makeMeta();
+  outer=document.createElement('div');outer.style.cssText='position:fixed;left:-20000px;top:0;width:794px;background:white;z-index:-1;';
+  const doc=document.getElementById('quoteTemplate').content.firstElementChild.cloneNode(true);
+  const rows=doc.querySelector('.rows');
+  let count=document.getElementById('long').checked?23:4;
+  for(let i=0;i<count;i++){
+   const tr=document.createElement('tr');
+   tr.innerHTML='<td>'+(i+1)+'</td><td>ISO/IEC 27001 資訊安全管理輔導（示意項目）<br><span style="color:#64736e;font-size:10px">制度建立、風險評鑑、內部稽核等服務</span></td><td>1 式</td><td>NT$ 75,000</td><td>NT$ 75,000</td>';
+   rows.appendChild(tr);
+  }
+  outer.appendChild(doc);document.body.appendChild(outer);
+  attachWatermark(doc,meta,Number(document.getElementById('opacity').value)||0.12);
+  const pdf=await html2pdf().set({margin:0,filename:'USIS-浮水印測試.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(doc).toPdf().get('pdf');
+  const pages=pdf.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    pdf.setPage(p);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(106,123,120);
+    pdf.text('USIS | '+meta.timestamp+' | '+meta.id+' | '+p+'/'+pages,105,294,{align:'center'});
+  }
+  if(previewUrl)URL.revokeObjectURL(previewUrl);
+  previewUrl=URL.createObjectURL(pdf.output('blob'));
+  document.getElementById('viewer').src=previewUrl+'#toolbar=0';
+  document.getElementById('previewPanel').style.display='block';
+  document.getElementById('download').disabled=false;
+  msg.textContent='追蹤識別碼：'+meta.id+' ｜ 匯出者：'+meta.operator+' ｜ 產生時間：'+meta.timestamp+' ｜ 頁數：'+pages+'（此測試不寫入 Log）';
+ }catch(err){msg.textContent='產生失敗：'+err.message;console.error(err);}
+ finally{if(outer)outer.remove();btn.disabled=false;}
+}
+function downloadPDF(){
+ if(!previewUrl)return;
+ const a=document.createElement('a');a.href=previewUrl;a.download=previewName;
+ document.body.appendChild(a);a.click();a.remove();
+}
+</script></body></html>
