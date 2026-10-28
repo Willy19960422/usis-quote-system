@@ -574,7 +574,7 @@
           <button class="btn btn-primary" id="saveBtn" onclick="saveQuotation()">儲存報價單</button>
           <button class="btn btn-line" onclick="saveAsNew()">另存新報價單</button>
           <button class="btn btn-primary" onclick="downloadQuotationPdf()">預覽 PDF</button>
-          <button class="btn btn-line" onclick="printQuotation()">列印／另存 PDF</button>
+          <button class="btn btn-line" onclick="printQuotation()">列印／另存 PDF（含浮水印）</button>
           <button class="btn btn-line" onclick="resetEditor()">清空重新填寫</button>
           <button class="btn btn-danger" id="deleteBtn" onclick="deleteQuotation()" style="display:none;">刪除</button>
         </div>
@@ -1012,7 +1012,7 @@
 <div id="pdfPreviewModal" role="dialog" aria-modal="true" aria-label="報價單 PDF 預覽" style="display:none;position:fixed;inset:0;background:#10252dcc;z-index:10010;align-items:center;justify-content:center;padding:16px">
   <div style="background:#fff;color:#233;border-radius:12px;width:min(980px,100%);height:min(92vh,1050px);display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #dce5e3">
-      <strong>報價單 PDF 預覽</strong>
+      <div><strong>報價單 PDF 預覽 · 浮水印測試</strong><div id="pdfPreviewWatermarkId" style="font-size:11px;color:#5d7770;margin-top:4px"></div></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-primary btn-sm" id="pdfConfirmDownload" onclick="confirmPdfDownload()">確認下載</button>
         <button class="btn btn-line btn-sm" onclick="closePdfPreview()">關閉</button>
@@ -2831,6 +2831,46 @@ async function unlockQuote(){
   toast('已解鎖，可以編輯');
 }
 
+/* ================= PDF 動態浮水印（POC：前端視覺測試，尚未寫入 Audit Log） =================
+   將浮水印先繪製到 html2pdf 用的 HTML，再由 html2canvas 與原始內容一起點陣化；
+   不是後端防竄改機制，不能阻止透過開發者工具／截圖／重製 PDF 繞過。
+*/
+function createPdfWatermarkMetadata(){
+  const random=new Uint8Array(9);
+  window.crypto.getRandomValues(random);
+  const id='USIS-'+Array.from(random,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+  return {
+    id,
+    company:String(companySettings.company_name||'USIS').trim().slice(0,36),
+    operator:String(currentProfile?.display_name||currentUser?.email||'未知使用者').trim().slice(0,32),
+    timestamp:new Date().toLocaleString('sv-SE',{timeZone:'Asia/Taipei',hour12:false})
+  };
+}
+function addRasterPdfWatermark(exportNode,meta){
+  const tile=document.createElement('canvas');
+  tile.width=620;tile.height=310;
+  const ctx=tile.getContext('2d');
+  if(!ctx)throw new Error('瀏覽器無法建立浮水印畫布');
+  ctx.translate(310,155);
+  ctx.rotate(-Math.PI/6);
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillStyle='rgba(15,92,79,0.13)';
+  ctx.font='700 23px "Noto Sans TC","Microsoft JhengHei",sans-serif';
+  ctx.fillText(meta.company+'｜內部文件',0,-32,560);
+  ctx.font='600 18px "Noto Sans TC","Microsoft JhengHei",sans-serif';
+  ctx.fillText('匯出者：'+meta.operator,0,3,550);
+  ctx.font='600 17px Arial,sans-serif';
+  ctx.fillText('ID: '+meta.id,0,36,550);
+  const overlay=document.createElement('div');
+  overlay.setAttribute('aria-hidden','true');
+  overlay.style.cssText='position:absolute;inset:0;z-index:30;pointer-events:none;background-repeat:repeat;background-position:center top;';
+  overlay.style.backgroundImage='url("'+tile.toDataURL('image/png')+'")';
+  exportNode.style.position='relative';
+  exportNode.appendChild(overlay);
+}
+/* ================= END PDF 浮水印測試 ================= */
+
 /* ================= 下載正式 PDF ================= */
 let pdfPreviewUrl=null;
 let pdfPreviewName='';
@@ -2851,7 +2891,7 @@ function confirmPdfDownload(){
 async function downloadQuotationPdf(){
  if(pdfPreviewBusy)return;
  pdfPreviewBusy=true;
- if(typeof html2pdf!=='function'){toast('PDF 產生元件尚未載入，請稍後重試或使用列印功能',true);return;}
+ if(typeof html2pdf!=='function'){pdfPreviewBusy=false;toast('PDF 產生元件尚未載入，請稍後重試',true);return;}
  const name=document.getElementById('f_client_name').value.trim()||'未命名客戶';
  const no=currentQuote?.quote_no||'草稿';
  const clean=x=>String(x).replace(/[\\/:*?"<>|\\x00-\\x1f]/g,'_').slice(0,70);
@@ -2873,10 +2913,28 @@ async function downloadQuotationPdf(){
   const images=Array.from(clone.querySelectorAll('img'));
   await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));
   const filename=clean('USIS_報價單_'+no+'_'+name)+'.pdf';
-  const blob=await html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(clone).outputPdf('blob');
+  const watermark=createPdfWatermarkMetadata();
+  // A4 210×297mm：讓浮水印至少覆蓋完整紙張高度，而不只是內容高度。
+  // 多頁報價時延伸到最後一頁紙張底部（包括簽章下方的留白）。
+  const pagePx=Math.floor(clone.getBoundingClientRect().width*297/210);
+  const pageCount=Math.max(1,Math.ceil(clone.scrollHeight/pagePx));
+  clone.style.minHeight=(pagePx*pageCount)+'px';
+  clone.style.boxSizing='border-box';
+  addRasterPdfWatermark(clone,watermark);
+  const pdf=await html2pdf().set({margin:0,filename,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(clone).toPdf().get('pdf');
+  // Footer is supplemental metadata; the repeating watermark above is composited into the page image.
+  const pages=pdf.internal.getNumberOfPages();
+  for(let page=1;page<=pages;page++){
+    pdf.setPage(page);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);
+    pdf.setTextColor(106,123,120);
+    pdf.text('USIS  |  '+watermark.timestamp+'  |  '+watermark.id+'  |  '+page+'/'+pages,105,294,{align:'center'});
+  }
+  const blob=pdf.output('blob');
   closePdfPreview();
   pdfPreviewUrl=URL.createObjectURL(blob);
   pdfPreviewName=filename;
+  document.getElementById('pdfPreviewWatermarkId').textContent='追蹤 ID：'+watermark.id+'（僅示範，尚未寫入 Log）';
   document.getElementById('pdfPreviewFrame').src=pdfPreviewUrl+'#toolbar=0';
   document.getElementById('pdfPreviewModal').style.display='flex';
   toast('預覽已產生，確認內容後再下載');
@@ -2937,10 +2995,9 @@ function renderQuotationPrintArea(){
 }
 
 function printQuotation(){
- renderQuotationPrintArea();
- const logo=document.getElementById('p_logo');
- if(logo.complete)window.print();
- else {logo.addEventListener('load',()=>window.print(),{once:true});logo.addEventListener('error',()=>window.print(),{once:true});}
+ // 測試版：避免正式 UI 的第二顆按鈕直接輸出未加浮水印 PDF。
+ toast('請在含浮水印 PDF 預覽中使用列印功能');
+ return downloadQuotationPdf();
 }
 
 /* ================= 小工具 ================= */
